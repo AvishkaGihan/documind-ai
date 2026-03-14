@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocuMind AI — Color Theme Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Dark Mode (Primary) */
+    --dm-surface-primary: #0D1117;
+    --dm-surface-secondary: #161B22;
+    --dm-surface-tertiary: #21262D;
+    --dm-border-default: #30363D;
+    --dm-border-emphasis: #484F58;
+    --dm-text-primary: #F0F6FC;
+    --dm-text-secondary: #8B949E;
+    --dm-text-tertiary: #6E7681;
+    --dm-accent-primary: #58A6FF;
+    --dm-accent-secondary: #3FB950;
+    --dm-accent-citation: #D2A8FF;
+    --dm-accent-warning: #D29922;
+    --dm-accent-error: #F85149;
+    --dm-accent-ai-glow: #79C0FF;
+
+    /* Light Mode */
+    --lm-surface-primary: #FFFFFF;
+    --lm-surface-secondary: #F6F8FA;
+    --lm-surface-tertiary: #EAEEF2;
+    --lm-border-default: #D0D7DE;
+    --lm-border-emphasis: #AFB8C1;
+    --lm-text-primary: #1F2328;
+    --lm-text-secondary: #656D76;
+    --lm-text-tertiary: #8C959F;
+    --lm-accent-primary: #0969DA;
+    --lm-accent-secondary: #1A7F37;
+    --lm-accent-citation: #8250DF;
+    --lm-accent-warning: #9A6700;
+    --lm-accent-error: #CF222E;
+    --lm-accent-ai-glow: #218BFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #050810;
+    color: #F0F6FC;
+    line-height: 1.6;
+  }
+
+  .header {
+    text-align: center;
+    padding: 60px 20px 40px;
+    background: linear-gradient(180deg, #0D1117 0%, #050810 100%);
+    border-bottom: 1px solid #21262D;
+  }
+
+  .header h1 {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #58A6FF, #D2A8FF, #79C0FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+
+  .header p {
+    color: #8B949E;
+    font-size: 18px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .mode-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    background: #0D1117;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid #21262D;
+  }
+
+  .mode-btn {
+    padding: 12px 32px;
+    border: 2px solid #30363D;
+    border-radius: 12px;
+    background: transparent;
+    color: #8B949E;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .mode-btn.active {
+    border-color: #58A6FF;
+    color: #58A6FF;
+    background: rgba(88, 166, 255, 0.08);
+    box-shadow: 0 0 20px rgba(88, 166, 255, 0.1);
+  }
+
+  .mode-btn:hover:not(.active) {
+    border-color: #484F58;
+    color: #F0F6FC;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: #F0F6FC;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::before {
+    content: '';
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(180deg, #58A6FF, #D2A8FF);
+    border-radius: 2px;
+  }
+
+  /* Color Swatches */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .color-swatch {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #30363D;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .color-swatch:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .swatch-preview {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .swatch-info {
+    padding: 12px 16px;
+    background: #161B22;
+  }
+
+  .swatch-name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .swatch-token {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #8B949E;
+  }
+
+  /* Phone Mockup */
+  .phone-mockup-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+  }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    border-radius: 44px;
+    border: 3px solid #30363D;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  }
+
+  .phone-notch {
+    width: 150px;
+    height: 28px;
+    background: #000;
+    border-radius: 0 0 20px 20px;
+    margin: 0 auto;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  /* Dark Mode Phone */
+  .phone-screen.dark {
+    background: #0D1117;
+    color: #F0F6FC;
+  }
+
+  .phone-screen.light {
+    background: #FFFFFF;
+    color: #1F2328;
+  }
+
+  /* App Bar */
+  .app-bar {
+    padding: 56px 16px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dark .app-bar {
+    background: rgba(13, 17, 23, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #21262D;
+  }
+
+  .light .app-bar {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #D0D7DE;
+  }
+
+  .app-bar-title {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .app-bar-subtitle {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .dark .app-bar-subtitle { color: #8B949E; }
+  .light .app-bar-subtitle { color: #656D76; }
+
+  /* Chat Messages */
+  .chat-area {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .message-bubble {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.5;
+    animation: fadeInUp 0.3s ease;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .user-bubble {
+    align-self: flex-end;
+    border-bottom-right-radius: 6px;
+  }
+
+  .dark .user-bubble {
+    background: #1F6FEB;
+    color: #FFFFFF;
+  }
+
+  .light .user-bubble {
+    background: #0969DA;
+    color: #FFFFFF;
+  }
+
+  .ai-bubble {
+    align-self: flex-start;
+    border-bottom-left-radius: 6px;
+  }
+
+  .dark .ai-bubble {
+    background: #161B22;
+    border: 1px solid #30363D;
+    color: #F0F6FC;
+  }
+
+  .light .ai-bubble {
+    background: #F6F8FA;
+    border: 1px solid #D0D7DE;
+    color: #1F2328;
+  }
+
+  .citation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    margin: 6px 4px 2px 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .dark .citation-chip {
+    background: rgba(210, 168, 255, 0.15);
+    color: #D2A8FF;
+    border: 1px solid rgba(210, 168, 255, 0.3);
+  }
+
+  .light .citation-chip {
+    background: rgba(130, 80, 223, 0.1);
+    color: #8250DF;
+    border: 1px solid rgba(130, 80, 223, 0.3);
+  }
+
+  .citation-chip:hover {
+    transform: scale(1.05);
+  }
+
+  .dark .citation-chip:hover {
+    background: rgba(210, 168, 255, 0.25);
+    box-shadow: 0 0 12px rgba(210, 168, 255, 0.2);
+  }
+
+  .light .citation-chip:hover {
+    background: rgba(130, 80, 223, 0.2);
+  }
+
+  /* Chat Input */
+  .chat-input-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 16px 36px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dark .chat-input-bar {
+    background: rgba(13, 17, 23, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid #21262D;
+  }
+
+  .light .chat-input-bar {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid #D0D7DE;
+  }
+
+  .chat-input {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 24px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .dark .chat-input {
+    background: #21262D;
+    border: 1px solid #30363D;
+    color: #F0F6FC;
+  }
+
+  .light .chat-input {
+    background: #F6F8FA;
+    border: 1px solid #D0D7DE;
+    color: #1F2328;
+  }
+
+  .send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 18px;
+  }
+
+  .dark .send-btn {
+    background: #58A6FF;
+    color: #0D1117;
+  }
+
+  .light .send-btn {
+    background: #0969DA;
+    color: #FFFFFF;
+  }
+
+  .send-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px rgba(88, 166, 255, 0.4);
+  }
+
+  /* Document Card */
+  .doc-card-section {
+    margin-bottom: 48px;
+  }
+
+  .doc-cards-grid {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .doc-card {
+    width: 340px;
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .doc-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.3), rgba(210, 168, 255, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .doc-card:hover::before {
+    opacity: 1;
+  }
+
+  .dark .doc-card {
+    background: rgba(22, 27, 34, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid #30363D;
+  }
+
+  .light .doc-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid #D0D7DE;
+    color: #1F2328;
+  }
+
+  .doc-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .doc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .doc-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  .dark .doc-icon { background: rgba(88, 166, 255, 0.1); }
+  .light .doc-icon { background: rgba(9, 105, 218, 0.08); }
+
+  .doc-title {
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+  }
+
+  .doc-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .status-ready { background: #3FB950; box-shadow: 0 0 8px rgba(63, 185, 80, 0.4); }
+  .status-processing { background: #79C0FF; animation: pulse 1.5s infinite; }
+  .status-error { background: #F85149; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .doc-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .dark .doc-meta { color: #8B949E; }
+  .light .doc-meta { color: #656D76; }
+
+  /* Typography Showcase */
+  .type-showcase {
+    margin-bottom: 48px;
+  }
+
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid #21262D;
+  }
+
+  .type-label {
+    width: 120px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #8B949E;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .type-spec {
+    width: 140px;
+    font-size: 11px;
+    color: #6E7681;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .type-sample {
+    flex: 1;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6E7681;
+    font-size: 13px;
+    border-top: 1px solid #21262D;
+  }
+
+  /* Hidden sections */
+  .theme-section { display: block; }
+  .theme-section.hidden { display: none; }
+
+  /* AI Glow Animation */
+  .ai-glow {
+    position: relative;
+  }
+
+  .ai-glow::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.2), rgba(210, 168, 255, 0.2));
+    border-radius: 20px;
+    z-index: -1;
+    animation: glow 3s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Processing animation */
+  .processing-stages {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px;
+    border-radius: 16px;
+    max-width: 400px;
+    margin: 0 auto 48px;
+  }
+
+  .dark .processing-stages { background: #161B22; border: 1px solid #30363D; }
+  .light .processing-stages { background: #F6F8FA; border: 1px solid #D0D7DE; }
+
+  .stage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  .stage-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .stage.done .stage-icon { background: rgba(63, 185, 80, 0.15); }
+  .stage.active .stage-icon { background: rgba(121, 192, 255, 0.15); animation: pulse 1.5s infinite; }
+  .stage.pending .stage-icon { background: rgba(110, 118, 129, 0.1); }
+  .stage.pending { color: #6E7681; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>DocuMind AI</h1>
+  <p>Color Theme & Visual System Visualizer — Midnight Intelligence Design Language</p>
+</div>
+
+<div class="mode-toggle">
+  <button class="mode-btn active" onclick="switchMode('dark')">🌙 Dark Mode (Primary)</button>
+  <button class="mode-btn" onclick="switchMode('light')">☀️ Light Mode</button>
+</div>
+
+<div class="container">
+
+  <!-- SURFACES -->
+  <h2 class="section-title">Surface Colors</h2>
+  <div class="color-grid" id="surfaces-grid">
+    <!-- Dark mode surfaces (default) -->
+  </div>
+
+  <!-- ACCENTS -->
+  <h2 class="section-title">Accent & Semantic Colors</h2>
+  <div class="color-grid" id="accents-grid">
+  </div>
+
+  <!-- TEXT COLORS -->
+  <h2 class="section-title">Text Colors</h2>
+  <div class="color-grid" id="text-grid">
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <h2 class="section-title">Typography System</h2>
+  <div class="type-showcase">
+    <div class="type-row">
+      <span class="type-label">Display</span>
+      <span class="type-spec">28sp / 700</span>
+      <span class="type-sample" style="font-size:28px;font-weight:700;">DocuMind AI</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Title Large</span>
+      <span class="type-spec">22sp / 600</span>
+      <span class="type-sample" style="font-size:22px;font-weight:600;">Document Library</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Title Medium</span>
+      <span class="type-spec">18sp / 600</span>
+      <span class="type-sample" style="font-size:18px;font-weight:600;">Contract_Review.pdf</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Body Large</span>
+      <span class="type-spec">16sp / 400</span>
+      <span class="type-sample" style="font-size:16px;font-weight:400;">According to page 12, the termination clause requires 30 days written notice.</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Body Medium</span>
+      <span class="type-spec">14sp / 400</span>
+      <span class="type-sample" style="font-size:14px;font-weight:400;">What are the payment terms in this contract?</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Label Large</span>
+      <span class="type-spec">14sp / 500</span>
+      <span class="type-sample" style="font-size:14px;font-weight:500;">Upload PDF</span>
+    </div>
+    <div class="type-row">
+      <span class="type-label">Code</span>
+      <span class="type-spec">13sp / Mono</span>
+      <span class="type-sample" style="font-size:13px;font-family:'JetBrains Mono',monospace;">📄 Page 12-14</span>
+    </div>
+  </div>
+
+  <!-- DOCUMENT CARDS -->
+  <h2 class="section-title">Document Cards</h2>
+  <div class="doc-cards-grid" id="doc-cards">
+  </div>
+
+  <br><br>
+
+  <!-- PROCESSING ANIMATION -->
+  <h2 class="section-title">Processing States</h2>
+  <div class="processing-stages" id="processing-demo">
+    <div class="stage done">
+      <div class="stage-icon">✅</div>
+      <span>Extracting text from 42 pages…</span>
+    </div>
+    <div class="stage done">
+      <div class="stage-icon">✅</div>
+      <span>Creating knowledge chunks…</span>
+    </div>
+    <div class="stage active">
+      <div class="stage-icon">🧠</div>
+      <span>Building intelligence index…</span>
+    </div>
+    <div class="stage pending">
+      <div class="stage-icon">⏳</div>
+      <span>Ready to answer questions</span>
+    </div>
+  </div>
+
+  <!-- PHONE MOCKUPS -->
+  <h2 class="section-title">Chat Interface Preview</h2>
+  <div class="phone-mockup-container">
+    <!-- Dark Mode Phone -->
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen dark" id="phone-dark">
+        <div class="app-bar">
+          <div>
+            <div class="app-bar-title">📄 Contract_Review.pdf</div>
+            <div class="app-bar-subtitle">42 pages • Ready</div>
+          </div>
+        </div>
+        <div class="chat-area">
+          <div class="message-bubble user-bubble">
+            What are the termination conditions and notice period?
+          </div>
+          <div class="message-bubble ai-bubble ai-glow">
+            The contract specifies two termination scenarios:
+            <br><br>
+            <strong>1. Termination for Convenience:</strong> Either party may terminate with <strong>30 days written notice</strong>. All outstanding invoices must be settled within 15 business days of termination.
+            <br><br>
+            <strong>2. Termination for Cause:</strong> Immediate termination is permitted upon material breach, with a <strong>10-day cure period</strong> for the breaching party.
+            <br><br>
+            <span class="citation-chip">📄 Page 12</span>
+            <span class="citation-chip">📄 Page 14</span>
+          </div>
+          <div class="message-bubble user-bubble">
+            What about liability caps?
+          </div>
+          <div class="message-bubble ai-bubble">
+            The aggregate liability is capped at <strong>the total fees paid in the preceding 12-month period</strong>. Neither party shall be liable for indirect, incidental, or consequential damages.
+            <br><br>
+            <span class="citation-chip">📄 Page 18</span>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input" type="text" placeholder="Ask about this document..." disabled>
+          <button class="send-btn">↑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Light Mode Phone -->
+    <div class="phone-frame" id="phone-light-frame" style="display:none;">
+      <div class="phone-notch"></div>
+      <div class="phone-screen light">
+        <div class="app-bar">
+          <div>
+            <div class="app-bar-title">📄 Contract_Review.pdf</div>
+            <div class="app-bar-subtitle">42 pages • Ready</div>
+          </div>
+        </div>
+        <div class="chat-area">
+          <div class="message-bubble user-bubble">
+            What are the termination conditions and notice period?
+          </div>
+          <div class="message-bubble ai-bubble">
+            The contract specifies two termination scenarios:
+            <br><br>
+            <strong>1. Termination for Convenience:</strong> Either party may terminate with <strong>30 days written notice</strong>.
+            <br><br>
+            <strong>2. Termination for Cause:</strong> Immediate termination upon material breach, with a <strong>10-day cure period</strong>.
+            <br><br>
+            <span class="citation-chip">📄 Page 12</span>
+            <span class="citation-chip">📄 Page 14</span>
+          </div>
+          <div class="message-bubble user-bubble">
+            What about liability caps?
+          </div>
+          <div class="message-bubble ai-bubble">
+            Aggregate liability capped at <strong>total fees paid in the preceding 12 months</strong>. No consequential damages.
+            <br><br>
+            <span class="citation-chip">📄 Page 18</span>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input" type="text" placeholder="Ask about this document..." disabled>
+          <button class="send-btn">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  DocuMind AI — UX Design Specification • Color Theme Visualizer • 2026
+</div>
+
+<script>
+const colors = {
+  dark: {
+    surfaces: [
+      { name: 'Surface Primary', token: '--surface-primary', hex: '#0D1117', textColor: '#F0F6FC' },
+      { name: 'Surface Secondary', token: '--surface-secondary', hex: '#161B22', textColor: '#F0F6FC' },
+      { name: 'Surface Tertiary', token: '--surface-tertiary', hex: '#21262D', textColor: '#F0F6FC' },
+      { name: 'Border Default', token: '--border-default', hex: '#30363D', textColor: '#F0F6FC' },
+      { name: 'Border Emphasis', token: '--border-emphasis', hex: '#484F58', textColor: '#F0F6FC' },
+    ],
+    accents: [
+      { name: 'Primary (Action)', token: '--accent-primary', hex: '#58A6FF', textColor: '#0D1117' },
+      { name: 'Success (Ready)', token: '--accent-secondary', hex: '#3FB950', textColor: '#0D1117' },
+      { name: 'Citation', token: '--accent-citation', hex: '#D2A8FF', textColor: '#0D1117' },
+      { name: 'Warning', token: '--accent-warning', hex: '#D29922', textColor: '#0D1117' },
+      { name: 'Error', token: '--accent-error', hex: '#F85149', textColor: '#0D1117' },
+      { name: 'AI Glow', token: '--accent-ai-glow', hex: '#79C0FF', textColor: '#0D1117' },
+    ],
+    text: [
+      { name: 'Text Primary', token: '--text-primary', hex: '#F0F6FC', textColor: '#0D1117', previewBg: '#0D1117' },
+      { name: 'Text Secondary', token: '--text-secondary', hex: '#8B949E', textColor: '#0D1117', previewBg: '#0D1117' },
+      { name: 'Text Tertiary', token: '--text-tertiary', hex: '#6E7681', textColor: '#0D1117', previewBg: '#0D1117' },
+    ]
+  },
+  light: {
+    surfaces: [
+      { name: 'Surface Primary', token: '--surface-primary', hex: '#FFFFFF', textColor: '#1F2328' },
+      { name: 'Surface Secondary', token: '--surface-secondary', hex: '#F6F8FA', textColor: '#1F2328' },
+      { name: 'Surface Tertiary', token: '--surface-tertiary', hex: '#EAEEF2', textColor: '#1F2328' },
+      { name: 'Border Default', token: '--border-default', hex: '#D0D7DE', textColor: '#1F2328' },
+      { name: 'Border Emphasis', token: '--border-emphasis', hex: '#AFB8C1', textColor: '#1F2328' },
+    ],
+    accents: [
+      { name: 'Primary (Action)', token: '--accent-primary', hex: '#0969DA', textColor: '#FFFFFF' },
+      { name: 'Success (Ready)', token: '--accent-secondary', hex: '#1A7F37', textColor: '#FFFFFF' },
+      { name: 'Citation', token: '--accent-citation', hex: '#8250DF', textColor: '#FFFFFF' },
+      { name: 'Warning', token: '--accent-warning', hex: '#9A6700', textColor: '#FFFFFF' },
+      { name: 'Error', token: '--accent-error', hex: '#CF222E', textColor: '#FFFFFF' },
+      { name: 'AI Glow', token: '--accent-ai-glow', hex: '#218BFF', textColor: '#FFFFFF' },
+    ],
+    text: [
+      { name: 'Text Primary', token: '--text-primary', hex: '#1F2328', textColor: '#FFFFFF', previewBg: '#FFFFFF' },
+      { name: 'Text Secondary', token: '--text-secondary', hex: '#656D76', textColor: '#FFFFFF', previewBg: '#FFFFFF' },
+      { name: 'Text Tertiary', token: '--text-tertiary', hex: '#8C959F', textColor: '#FFFFFF', previewBg: '#FFFFFF' },
+    ]
+  }
+};
+
+function renderSwatches(mode) {
+  const data = colors[mode];
+
+  document.getElementById('surfaces-grid').innerHTML = data.surfaces.map(c => `
+    <div class="color-swatch">
+      <div class="swatch-preview" style="background:${c.hex};color:${c.textColor}">${c.hex}</div>
+      <div class="swatch-info">
+        <div class="swatch-name">${c.name}</div>
+        <div class="swatch-token">${c.token}</div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('accents-grid').innerHTML = data.accents.map(c => `
+    <div class="color-swatch">
+      <div class="swatch-preview" style="background:${c.hex};color:${c.textColor}">${c.hex}</div>
+      <div class="swatch-info">
+        <div class="swatch-name">${c.name}</div>
+        <div class="swatch-token">${c.token}</div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('text-grid').innerHTML = data.text.map(c => `
+    <div class="color-swatch">
+      <div class="swatch-preview" style="background:${c.previewBg || c.hex};color:${c.hex};border:1px solid ${mode === 'dark' ? '#30363D' : '#D0D7DE'}">
+        <span style="color:${c.hex}">Sample Text</span>
+      </div>
+      <div class="swatch-info">
+        <div class="swatch-name">${c.name}</div>
+        <div class="swatch-token">${c.token} • ${c.hex}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Document cards
+  const cardClass = mode === 'dark' ? 'dark' : 'light';
+  document.getElementById('doc-cards').innerHTML = `
+    <div class="doc-card ${cardClass}">
+      <div class="doc-card-header">
+        <div class="doc-icon">📄</div>
+        <div class="doc-title">Contract_Review.pdf</div>
+      </div>
+      <div class="doc-status">
+        <span class="status-dot status-ready"></span>
+        <span style="color:#3FB950">Ready</span>
+      </div>
+      <div class="doc-meta">
+        <span>42 pages</span>
+        <span>2.4 MB</span>
+        <span>Mar 14, 2026</span>
+      </div>
+    </div>
+    <div class="doc-card ${cardClass}">
+      <div class="doc-card-header">
+        <div class="doc-icon">📄</div>
+        <div class="doc-title">TabTransformer_Paper.pdf</div>
+      </div>
+      <div class="doc-status">
+        <span class="status-dot status-processing"></span>
+        <span style="color:#79C0FF">Processing…</span>
+      </div>
+      <div class="doc-meta">
+        <span>28 pages</span>
+        <span>1.8 MB</span>
+        <span>Mar 14, 2026</span>
+      </div>
+    </div>
+    <div class="doc-card ${cardClass}">
+      <div class="doc-card-header">
+        <div class="doc-icon">📄</div>
+        <div class="doc-title">FastAPI_Docs_v0.109.pdf</div>
+      </div>
+      <div class="doc-status">
+        <span class="status-dot status-error"></span>
+        <span style="color:#F85149">Error — Retry</span>
+      </div>
+      <div class="doc-meta">
+        <span>214 pages</span>
+        <span>8.1 MB</span>
+        <span>Mar 13, 2026</span>
+      </div>
+    </div>
+  `;
+}
+
+function switchMode(mode) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const phoneDark = document.querySelector('.phone-frame:first-child');
+  const phoneLight = document.getElementById('phone-light-frame');
+
+  if (mode === 'dark') {
+    document.body.style.background = '#050810';
+    document.body.style.color = '#F0F6FC';
+    phoneDark.style.display = 'block';
+    phoneLight.style.display = 'none';
+    document.querySelectorAll('.swatch-info').forEach(el => el.style.background = '#161B22');
+  } else {
+    document.body.style.background = '#F0F2F5';
+    document.body.style.color = '#1F2328';
+    phoneDark.style.display = 'none';
+    phoneLight.style.display = 'block';
+    document.querySelectorAll('.swatch-info').forEach(el => el.style.background = '#F6F8FA');
+  }
+
+  renderSwatches(mode);
+}
+
+// Initialize
+renderSwatches('dark');
+</script>
+
+</body>
+</html>

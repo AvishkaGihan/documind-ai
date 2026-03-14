@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocuMind AI — Design Directions</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #050810;
+      color: #F0F6FC;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 80px 20px 60px;
+      background: linear-gradient(180deg, #0D1117 0%, #050810 100%);
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #58A6FF 0%, #D2A8FF 50%, #79C0FF 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: #8B949E;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Direction Navigation */
+    .direction-nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 24px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5, 8, 16, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid #21262D;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      border: 1px solid #30363D;
+      border-radius: 10px;
+      background: transparent;
+      color: #8B949E;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .nav-btn.active {
+      border-color: #58A6FF;
+      color: #58A6FF;
+      background: rgba(88, 166, 255, 0.08);
+      box-shadow: 0 0 20px rgba(88, 166, 255, 0.08);
+    }
+
+    .nav-btn:hover:not(.active) {
+      border-color: #484F58;
+      color: #F0F6FC;
+    }
+
+    .nav-btn .winner-badge {
+      background: #3FB950;
+      color: #0D1117;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      font-weight: 700;
+    }
+
+    /* Direction Container */
+    .direction {
+      display: none;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .direction.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .direction-header {
+      text-align: center;
+      padding: 48px 20px 32px;
+    }
+
+    .direction-header h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .direction-header p {
+      font-size: 16px;
+      color: #8B949E;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .direction-header .tag {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+
+    /* Phone Frame */
+    .mockup-row {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      padding: 0 20px 48px;
+      flex-wrap: wrap;
+    }
+
+    .mockup-label {
+      text-align: center;
+      font-size: 13px;
+      color: #8B949E;
+      font-weight: 600;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .phone {
+      width: 360px;
+      height: 780px;
+      border-radius: 40px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    }
+
+    .phone .notch {
+      width: 130px;
+      height: 26px;
+      background: #000;
+      border-radius: 0 0 16px 16px;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+
+    .phone .screen {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    /* === DIRECTION 1: Midnight Scholar === */
+    .d1-screen {
+      background: #0D1117;
+      color: #F0F6FC;
+    }
+
+    .d1-screen .appbar {
+      padding: 52px 16px 14px;
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #21262D;
+    }
+
+    .d1-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .d1-screen .appbar-sub {
+      font-size: 11px;
+      color: #8B949E;
+      margin-top: 2px;
+    }
+
+    .d1-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .d1-screen .msg {
+      max-width: 82%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .d1-screen .msg-user {
+      align-self: flex-end;
+      background: #1F6FEB;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .d1-screen .msg-ai {
+      align-self: flex-start;
+      background: #161B22;
+      border: 1px solid #30363D;
+      border-bottom-left-radius: 4px;
+    }
+
+    .d1-screen .cite {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(210, 168, 255, 0.15);
+      color: #D2A8FF;
+      border: 1px solid rgba(210, 168, 255, 0.3);
+      margin-top: 6px;
+      margin-right: 4px;
+    }
+
+    .d1-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid #21262D;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d1-screen .input-field {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: #21262D;
+      border: 1px solid #30363D;
+      color: #8B949E;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .d1-screen .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #58A6FF;
+      border: none;
+      color: #0D1117;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    /* === DIRECTION 2: Clean Professional === */
+    .d2-screen {
+      background: #FFFFFF;
+      color: #1F2328;
+    }
+
+    .d2-screen .appbar {
+      padding: 52px 16px 14px;
+      background: #fff;
+      border-bottom: 1px solid #D0D7DE;
+    }
+
+    .d2-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1F2328;
+    }
+
+    .d2-screen .appbar-sub {
+      font-size: 11px;
+      color: #656D76;
+      margin-top: 2px;
+    }
+
+    .d2-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .d2-screen .msg {
+      max-width: 82%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .d2-screen .msg-user {
+      align-self: flex-end;
+      background: #0969DA;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .d2-screen .msg-ai {
+      align-self: flex-start;
+      background: #F6F8FA;
+      border: 1px solid #D0D7DE;
+      color: #1F2328;
+      border-bottom-left-radius: 4px;
+    }
+
+    .d2-screen .cite {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(130, 80, 223, 0.08);
+      color: #8250DF;
+      border: 1px solid rgba(130, 80, 223, 0.2);
+      margin-top: 6px;
+      margin-right: 4px;
+    }
+
+    .d2-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: #fff;
+      border-top: 1px solid #D0D7DE;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d2-screen .input-field {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: #F6F8FA;
+      border: 1px solid #D0D7DE;
+      color: #656D76;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .d2-screen .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #0969DA;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    /* === DIRECTION 3: Neon Intelligence === */
+    .d3-screen {
+      background: #0A0A14;
+      color: #E0E0FF;
+    }
+
+    .d3-screen .appbar {
+      padding: 52px 16px 14px;
+      background: rgba(10, 10, 20, 0.95);
+      border-bottom: 1px solid #1A1A3E;
+    }
+
+    .d3-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #00FFAA;
+      text-shadow: 0 0 12px rgba(0, 255, 170, 0.3);
+    }
+
+    .d3-screen .appbar-sub {
+      font-size: 11px;
+      color: #7070AA;
+      margin-top: 2px;
+    }
+
+    .d3-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .d3-screen .msg {
+      max-width: 82%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .d3-screen .msg-user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #6C3AFF, #3A8CFF);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .d3-screen .msg-ai {
+      align-self: flex-start;
+      background: rgba(20, 20, 40, 0.9);
+      border: 1px solid #2A2A5E;
+      color: #E0E0FF;
+      border-bottom-left-radius: 4px;
+    }
+
+    .d3-screen .cite {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(0, 255, 170, 0.08);
+      color: #00FFAA;
+      border: 1px solid rgba(0, 255, 170, 0.3);
+      margin-top: 6px;
+      margin-right: 4px;
+      text-shadow: 0 0 8px rgba(0, 255, 170, 0.2);
+    }
+
+    .d3-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: rgba(10, 10, 20, 0.95);
+      border-top: 1px solid #1A1A3E;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d3-screen .input-field {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: #14142A;
+      border: 1px solid #2A2A5E;
+      color: #7070AA;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .d3-screen .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6C3AFF, #00FFAA);
+      border: none;
+      color: #0A0A14;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 0 16px rgba(0, 255, 170, 0.3);
+    }
+
+    /* === DIRECTION 4: Warm Knowledge === */
+    .d4-screen {
+      background: #1A1510;
+      color: #F0E6D3;
+    }
+
+    .d4-screen .appbar {
+      padding: 52px 16px 14px;
+      background: rgba(26, 21, 16, 0.95);
+      border-bottom: 1px solid #3D3228;
+    }
+
+    .d4-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #F0E6D3;
+    }
+
+    .d4-screen .appbar-sub {
+      font-size: 11px;
+      color: #9E8E78;
+      margin-top: 2px;
+    }
+
+    .d4-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .d4-screen .msg {
+      max-width: 82%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .d4-screen .msg-user {
+      align-self: flex-end;
+      background: #C87533;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .d4-screen .msg-ai {
+      align-self: flex-start;
+      background: #241E16;
+      border: 1px solid #3D3228;
+      color: #F0E6D3;
+      border-bottom-left-radius: 4px;
+    }
+
+    .d4-screen .cite {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(218, 165, 32, 0.12);
+      color: #DAA520;
+      border: 1px solid rgba(218, 165, 32, 0.3);
+      margin-top: 6px;
+      margin-right: 4px;
+    }
+
+    .d4-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: rgba(26, 21, 16, 0.95);
+      border-top: 1px solid #3D3228;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d4-screen .input-field {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: #241E16;
+      border: 1px solid #3D3228;
+      color: #9E8E78;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .d4-screen .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #C87533;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    /* === DIRECTION 5: Glass & Light === */
+    .d5-screen {
+      background: linear-gradient(180deg, #E8EEF5 0%, #D5DFE9 100%);
+      color: #2D3748;
+    }
+
+    .d5-screen .appbar {
+      padding: 52px 16px 14px;
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .d5-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #2D3748;
+    }
+
+    .d5-screen .appbar-sub {
+      font-size: 11px;
+      color: #718096;
+      margin-top: 2px;
+    }
+
+    .d5-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .d5-screen .msg {
+      max-width: 82%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .d5-screen .msg-user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #667EEA, #764BA2);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .d5-screen .msg-ai {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      color: #2D3748;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .d5-screen .cite {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: rgba(102, 126, 234, 0.08);
+      color: #667EEA;
+      border: 1px solid rgba(102, 126, 234, 0.2);
+      margin-top: 6px;
+      margin-right: 4px;
+    }
+
+    .d5-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d5-screen .input-field {
+      flex: 1;
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      color: #718096;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .d5-screen .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667EEA, #764BA2);
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    /* === DIRECTION 6: Hybrid Premium (CHOSEN) === */
+    .d6-screen {
+      background: #0D1117;
+      color: #F0F6FC;
+    }
+
+    .d6-screen .appbar {
+      padding: 52px 16px 14px;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+    }
+
+    .d6-screen .appbar-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .d6-screen .appbar-sub {
+      font-size: 11px;
+      color: #8B949E;
+      margin-top: 2px;
+    }
+
+    .d6-screen .chat {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .d6-screen .msg {
+      max-width: 82%;
+      padding: 12px 15px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .d6-screen .msg-user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #1F6FEB, #58A6FF);
+      color: #fff;
+      border-bottom-right-radius: 5px;
+      box-shadow: 0 4px 16px rgba(31, 111, 235, 0.25);
+    }
+
+    .d6-screen .msg-ai {
+      align-self: flex-start;
+      background: rgba(22, 27, 34, 0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(48, 54, 61, 0.6);
+      border-bottom-left-radius: 5px;
+      position: relative;
+    }
+
+    .d6-screen .msg-ai::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 18px;
+      border-bottom-left-radius: 5px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(88, 166, 255, 0.15), rgba(210, 168, 255, 0.15));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .d6-screen .cite {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 10px;
+      border-radius: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      background: rgba(210, 168, 255, 0.12);
+      color: #D2A8FF;
+      border: 1px solid rgba(210, 168, 255, 0.25);
+      margin-top: 8px;
+      margin-right: 5px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .d6-screen .cite:hover {
+      background: rgba(210, 168, 255, 0.22);
+      box-shadow: 0 0 14px rgba(210, 168, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .d6-screen .input-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px 32px;
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(48, 54, 61, 0.5);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .d6-screen .input-field {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 22px;
+      background: rgba(33, 38, 45, 0.8);
+      border: 1px solid #30363D;
+      color: #F0F6FC;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
+    }
+
+    .d6-screen .input-field:focus {
+      border-color: #58A6FF;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+    }
+
+    .d6-screen .send {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #58A6FF, #79C0FF);
+      border: none;
+      color: #0D1117;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 12px rgba(88, 166, 255, 0.25);
+    }
+
+    .d6-screen .send:hover {
+      transform: scale(1.08);
+      box-shadow: 0 4px 20px rgba(88, 166, 255, 0.4);
+    }
+
+    /* Rating */
+    .rating-section {
+      max-width: 900px;
+      margin: 32px auto 60px;
+      padding: 0 20px;
+    }
+
+    .rating-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .rating-table th,
+    .rating-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #21262D;
+    }
+
+    .rating-table th {
+      color: #8B949E;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .rating-table td:first-child {
+      font-weight: 600;
+    }
+
+    .rating-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #21262D;
+      overflow: hidden;
+    }
+
+    .rating-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .chosen-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #3FB950;
+      color: #0D1117;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 40px;
+      color: #6E7681;
+      font-size: 13px;
+      border-top: 1px solid #21262D;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="hero">
+    <h1>Design Directions</h1>
+    <p>Six visual approaches for DocuMind AI — explore each direction's personality, then review the comparison below
+    </p>
+  </div>
+
+  <div class="direction-nav">
+    <button class="nav-btn" onclick="showDirection(1)">1. Midnight Scholar</button>
+    <button class="nav-btn" onclick="showDirection(2)">2. Clean Professional</button>
+    <button class="nav-btn" onclick="showDirection(3)">3. Neon Intelligence</button>
+    <button class="nav-btn" onclick="showDirection(4)">4. Warm Knowledge</button>
+    <button class="nav-btn" onclick="showDirection(5)">5. Glass & Light</button>
+    <button class="nav-btn active" onclick="showDirection(6)">6. Hybrid Premium <span class="winner-badge">★
+        CHOSEN</span></button>
+  </div>
+
+  <!-- DIRECTION 1 -->
+  <div class="direction" id="dir-1">
+    <div class="direction-header">
+      <h2>1. Midnight Scholar</h2>
+      <p>Deep dark mode with rich academic blues. Feels like a premium research tool — scholarly yet modern.</p>
+      <div class="tag" style="background:rgba(88,166,255,0.1);color:#58A6FF;border:1px solid rgba(88,166,255,0.3);">
+        Academic • Premium • Focused</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface</div>
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="screen d1-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 Research_Paper.pdf</div>
+              <div class="appbar-sub">28 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">Which papers discuss transformer attention for tabular data?</div>
+              <div class="msg msg-ai">Based on the uploaded papers, two address this topic directly:<br><br><strong>1.
+                  "Attention Is All You Need for Tables"</strong> proposes a modified self-attention mechanism for
+                tabular feature interactions.<br><br><strong>2. "TabTransformer"</strong> introduces column-specific
+                attention heads for categorical features.<br><br><span class="cite">📄 Page 7</span><span
+                  class="cite">📄 Page 12</span></div>
+              <div class="msg msg-user">What evaluation methodology did TabTransformer use?</div>
+              <div class="msg msg-ai">TabTransformer was evaluated using <strong>6 binary classification
+                  benchmarks</strong> from the UCI repository. The authors compared against XGBoost, MLP, and standard
+                transformers using AUC-ROC and accuracy metrics.<br><br><span class="cite">📄 Pages 15-16</span></div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTION 2 -->
+  <div class="direction" id="dir-2">
+    <div class="direction-header">
+      <h2>2. Clean Professional</h2>
+      <p>Light mode with minimal chrome. Corporate-friendly, maximizes readability. Feels like a premium business tool.
+      </p>
+      <div class="tag" style="background:rgba(9,105,218,0.08);color:#0969DA;border:1px solid rgba(9,105,218,0.2);">
+        Professional • Clean • Corporate</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface</div>
+        <div class="phone" style="border-color:#D0D7DE">
+          <div class="notch" style="background:#E0E0E0"></div>
+          <div class="screen d2-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 Contract_Review.pdf</div>
+              <div class="appbar-sub">42 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">What are the termination conditions?</div>
+              <div class="msg msg-ai">The contract outlines two termination scenarios:<br><br><strong>1. For
+                  Convenience:</strong> Either party may terminate with 30 days written notice.<br><br><strong>2. For
+                  Cause:</strong> Immediate termination upon material breach with a 10-day cure period.<br><br><span
+                  class="cite">📄 Page 12</span><span class="cite">📄 Page 14</span></div>
+              <div class="msg msg-user">What about liability caps?</div>
+              <div class="msg msg-ai">Aggregate liability is capped at the total fees paid in the preceding 12-month
+                period. No consequential damages.<br><br><span class="cite">📄 Page 18</span></div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTION 3 -->
+  <div class="direction" id="dir-3">
+    <div class="direction-header">
+      <h2>3. Neon Intelligence</h2>
+      <p>High-contrast dark mode with vibrant neon accents. Cyberpunk-inspired, feels cutting-edge and futuristic.</p>
+      <div class="tag" style="background:rgba(0,255,170,0.08);color:#00FFAA;border:1px solid rgba(0,255,170,0.3);">
+        Futuristic • Bold • Tech-Forward</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface</div>
+        <div class="phone" style="border-color:#2A2A5E">
+          <div class="notch"></div>
+          <div class="screen d3-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 FastAPI_Docs.pdf</div>
+              <div class="appbar-sub">214 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">How do I add custom middleware for request logging?</div>
+              <div class="msg msg-ai">FastAPI supports custom middleware through Starlette's
+                <strong>BaseHTTPMiddleware</strong>. Here's the approach:<br><br>Create a middleware class that inherits
+                from <code>BaseHTTPMiddleware</code> and override the <code>dispatch</code> method to intercept requests
+                and responses.<br><br><span class="cite">📄 Page 87</span><span class="cite">📄 Page 89</span>
+              </div>
+              <div class="msg msg-user">Does this work with async routes?</div>
+              <div class="msg msg-ai">Yes! The <code>dispatch</code> method is already <strong>async by
+                  default</strong>, so it works seamlessly with async route handlers.<br><br><span class="cite">📄 Page
+                  90</span></div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTION 4 -->
+  <div class="direction" id="dir-4">
+    <div class="direction-header">
+      <h2>4. Warm Knowledge</h2>
+      <p>Earth tones with warm amber accents. Approachable and friendly, like a cozy library or study.</p>
+      <div class="tag" style="background:rgba(218,165,32,0.1);color:#DAA520;border:1px solid rgba(218,165,32,0.3);">Warm
+        • Friendly • Scholarly</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface</div>
+        <div class="phone" style="border-color:#3D3228">
+          <div class="notch"></div>
+          <div class="screen d4-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 Policy_Document.pdf</div>
+              <div class="appbar-sub">85 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">What is the data retention policy?</div>
+              <div class="msg msg-ai">The data retention policy specifies that <strong>personal data shall be retained
+                  for no longer than 3 years</strong> from the date of last interaction, unless required by
+                law.<br><br>Anonymized data may be retained indefinitely for analytics purposes.<br><br><span
+                  class="cite">📄 Page 23</span><span class="cite">📄 Page 24</span></div>
+              <div class="msg msg-user">Are there exceptions for legal holds?</div>
+              <div class="msg msg-ai">Yes — data subject to a <strong>legal hold or regulatory investigation</strong>
+                must be preserved until the matter concludes, regardless of standard retention periods.<br><br><span
+                  class="cite">📄 Page 26</span></div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTION 5 -->
+  <div class="direction" id="dir-5">
+    <div class="direction-header">
+      <h2>5. Glass & Light</h2>
+      <p>Frosted glass surfaces with soft gradients. Modern, ethereal, light and airy — like Arc Browser meets Notion.
+      </p>
+      <div class="tag" style="background:rgba(102,126,234,0.08);color:#667EEA;border:1px solid rgba(102,126,234,0.2);">
+        Ethereal • Modern • Translucent</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface</div>
+        <div class="phone" style="border-color:#C0C8D4">
+          <div class="notch" style="background:#B0B8C4"></div>
+          <div class="screen d5-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 UX_Research.pdf</div>
+              <div class="appbar-sub">56 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">What were the key findings from user interviews?</div>
+              <div class="msg msg-ai"><strong>Three major themes</strong> emerged from the 12 user interviews:<br><br>1.
+                Users prioritize <strong>speed over features</strong> when evaluating tools<br>2. <strong>Trust in
+                  AI</strong> requires visible source attribution<br>3. Mobile usage exceeds desktop by
+                <strong>67%</strong> in the target demographic<br><br><span class="cite">📄 Page 34</span><span
+                  class="cite">📄 Pages 38-40</span>
+              </div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTION 6: CHOSEN -->
+  <div class="direction active" id="dir-6">
+    <div class="direction-header">
+      <h2>6. Hybrid Premium <span class="chosen-badge" style="font-size:14px;vertical-align:middle;margin-left:8px;">★
+          CHOSEN</span></h2>
+      <p>Dark mode with glassmorphism accents, vibrant but controlled palette. The best of Midnight Scholar's depth with
+        modern glass effects.</p>
+      <div class="tag" style="background:rgba(88,166,255,0.08);color:#58A6FF;border:1px solid rgba(88,166,255,0.2);">
+        Premium • Modern • Distinctive</div>
+    </div>
+    <div class="mockup-row">
+      <div>
+        <div class="mockup-label">Chat Interface — Hybrid Premium</div>
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="screen d6-screen">
+            <div class="appbar">
+              <div class="appbar-title">📄 Contract_Review.pdf</div>
+              <div class="appbar-sub">42 pages • Ready</div>
+            </div>
+            <div class="chat">
+              <div class="msg msg-user">What are the termination conditions and notice period?</div>
+              <div class="msg msg-ai">The contract specifies two termination scenarios:<br><br><strong>1. Termination
+                  for Convenience:</strong> Either party may terminate with <strong>30 days written notice</strong>.
+                Outstanding invoices settled within 15 business days.<br><br><strong>2. Termination for Cause:</strong>
+                Immediate termination upon material breach, with a <strong>10-day cure period</strong> for the breaching
+                party.<br><br><span class="cite">📄 Page 12</span><span class="cite">📄 Page 14</span></div>
+              <div class="msg msg-user">What about liability caps?</div>
+              <div class="msg msg-ai">Aggregate liability is capped at <strong>total fees paid in the preceding 12-month
+                  period</strong>. Neither party liable for indirect, incidental, or consequential
+                damages.<br><br><strong>Important:</strong> This cap does not apply to breaches of confidentiality or IP
+                infringement.<br><br><span class="cite">📄 Page 18</span><span class="cite">📄 Page 19</span></div>
+            </div>
+            <div class="input-bar"><input class="input-field" placeholder="Ask about this document..." disabled><button
+                class="send">↑</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="rating-section">
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:24px;text-align:center;">Direction Comparison</h3>
+      <table class="rating-table">
+        <thead>
+          <tr>
+            <th>Criteria</th>
+            <th>1. Midnight</th>
+            <th>2. Clean</th>
+            <th>3. Neon</th>
+            <th>4. Warm</th>
+            <th>5. Glass</th>
+            <th>6. Hybrid ★</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Brand Uniqueness</td>
+            <td>★★★★</td>
+            <td>★★☆</td>
+            <td>★★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td>Readability</td>
+            <td>★★★★</td>
+            <td>★★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★</td>
+            <td>★★★★</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td>Trust Perception</td>
+            <td>★★★★★</td>
+            <td>★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td>Modern Feel</td>
+            <td>★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★★</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td>Mobile Comfort</td>
+            <td>★★★★</td>
+            <td>★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★★</td>
+            <td>★★★★</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td>Citation Visibility</td>
+            <td>★★★★★</td>
+            <td>★★★★</td>
+            <td>★★★★</td>
+            <td>★★★☆</td>
+            <td>★★★☆</td>
+            <td>★★★★★</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700">Overall Score</td>
+            <td>26/30</td>
+            <td>22/30</td>
+            <td>24/30</td>
+            <td>22/30</td>
+            <td>23/30</td>
+            <td style="color:#3FB950;font-weight:700">30/30</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    DocuMind AI — Design Directions Exploration • UX Design Specification • 2026
+  </div>
+
+  <script>
+    function showDirection(num) {
+      document.querySelectorAll('.direction').forEach(d => d.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`dir-${num}`).classList.add('active');
+      document.querySelectorAll('.nav-btn')[num - 1].classList.add('active');
+    }
+  </script>
+
+</body>
+
+</html>
