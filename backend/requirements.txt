@@ -11,6 +11,7 @@ passlib[bcrypt]
 boto3
 aiofiles
 sqlalchemy[asyncio]
+aiosqlite
 alembic
 asyncpg
 slowapi

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-15T22:00:17+05:30"
+last_updated: "2026-03-16T01:05:05+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -46,7 +46,7 @@ development_status:
   1-1-initialize-backend-project-with-fastapi-and-dependencies: done
   1-2-initialize-flutter-mobile-project-with-design-system-foundation: done
   1-3-configure-routing-state-management-and-app-shell: done
-  1-4-set-up-database-models-and-alembic-migrations: backlog
+  1-4-set-up-database-models-and-alembic-migrations: done
   1-5-configure-cicd-pipeline-with-github-actions: backlog
   epic-1-retrospective: optional
   epic-2: backlog
