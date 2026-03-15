@@ -1,6 +1,6 @@
 # Story 1.5: Configure CI/CD Pipeline with GitHub Actions
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,9 +48,9 @@ so that code quality is automatically validated on every push and pull request.
     - [x] `flutter analyze`
     - [x] `flutter test`
 
-- [ ] Verification gates (AC: 4)
-  - [ ] Open a PR and confirm both workflows run
-  - [ ] Ensure both workflows pass on the current mainline codebase
+- [x] Verification gates (AC: 4)
+  - [x] Open a PR and confirm both workflows run
+  - [x] Ensure both workflows pass on the current mainline codebase
 
 ## Dev Notes
 
@@ -106,6 +106,7 @@ GPT-5.3-Codex
   - `cd mobile && flutter pub get && flutter analyze && flutter test` -> passed
 - Branch `story/1-5-configure-cicd-pipeline` pushed to `origin`; GitHub returned PR creation URL.
 - `gh pr create` blocked by missing GitHub CLI authentication in this environment.
+- User-confirmed verification: GitHub Actions backend and mobile workflows both completed successfully on the PR.
 
 ### Completion Notes List
 
@@ -114,6 +115,10 @@ GPT-5.3-Codex
 - Added backend unit tests in `backend/tests/unit/test_ci_workflows.py` to assert required workflow files and key CI commands.
 - Verification-gate PR checks remain pending because opening and running an actual GitHub PR workflow is outside this local environment.
 - PR creation page opened in integrated browser: `https://github.com/AvishkaGihan/documind-ai/pull/new/story/1-5-configure-cicd-pipeline`.
+- Full local regression re-run before review handoff:
+  - `cd backend && .venv/bin/python -m ruff check . && .venv/bin/python -m pytest -q` -> passed
+  - `cd mobile && flutter analyze && flutter test` -> passed
+- Verification gates are now complete based on successful PR workflow runs.
 
 ### File List
 
@@ -126,3 +131,4 @@ GPT-5.3-Codex
 ## Change Log
 
 - 2026-03-16: Implemented backend/mobile GitHub Actions workflows with caching and added CI workflow validation tests.
+- 2026-03-16: Verification gates completed after successful GitHub Actions runs; story moved to review.
