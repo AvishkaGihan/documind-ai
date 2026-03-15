@@ -104,6 +104,8 @@ GPT-5.3-Codex
   - `cd backend && .venv/bin/python -m ruff check .` -> passed
   - `cd backend && .venv/bin/python -m pytest -q` -> passed (10 tests)
   - `cd mobile && flutter pub get && flutter analyze && flutter test` -> passed
+- Branch `story/1-5-configure-cicd-pipeline` pushed to `origin`; GitHub returned PR creation URL.
+- `gh pr create` blocked by missing GitHub CLI authentication in this environment.
 
 ### Completion Notes List
 
@@ -111,6 +113,7 @@ GPT-5.3-Codex
 - Added `.github/workflows/mobile-ci.yml` with stable Flutter setup, action cache enabled, and analyze/test steps in `mobile/`.
 - Added backend unit tests in `backend/tests/unit/test_ci_workflows.py` to assert required workflow files and key CI commands.
 - Verification-gate PR checks remain pending because opening and running an actual GitHub PR workflow is outside this local environment.
+- PR creation page opened in integrated browser: `https://github.com/AvishkaGihan/documind-ai/pull/new/story/1-5-configure-cicd-pipeline`.
 
 ### File List
 
