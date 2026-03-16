@@ -1,6 +1,9 @@
+from datetime import UTC, datetime
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.user import User
 from app.repositories.user_repository import create_user, get_by_email
 from app.schemas.auth import LoginResponse, SignUpResponse, TokenPair, UserPublic
 from app.services.auth.jwt_service import create_access_token, create_refresh_token
@@ -58,3 +61,7 @@ class AuthService:
             user=UserPublic(id=user.id, email=user.email),
             tokens=tokens,
         )
+
+    async def logout(self, user: User) -> None:
+        user.token_invalid_before = int(datetime.now(UTC).timestamp())
+        await self._session.commit()

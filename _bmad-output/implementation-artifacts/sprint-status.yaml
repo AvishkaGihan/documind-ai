@@ -1,5 +1,5 @@
 # generated: 2026-03-14T19:43:58+05:30
-# last_updated: 2026-03-16T16:54:21+05:30
+# last_updated: 2026-03-16T18:30:00+05:30
 # project: documind-ai
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-16T17:18:58+05:30"
+last_updated: "2026-03-16T18:30:00+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -52,7 +52,7 @@ development_status:
   epic-2: in-progress
   2-1-user-registration-api-endpoint: done
   2-2-user-login-api-endpoint: done
-  2-3-jwt-authentication-middleware-and-logout: backlog
+  2-3-jwt-authentication-middleware-and-logout: done
   2-4-password-reset-via-email: backlog
   2-5-flutter-authentication-screens-and-token-management: backlog
   epic-2-retrospective: optional

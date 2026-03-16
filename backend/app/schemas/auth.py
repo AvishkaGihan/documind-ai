@@ -33,3 +33,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     user: UserPublic
     tokens: TokenPair
+
+
+class LogoutResponse(BaseModel):
+    status: Literal["ok"] = "ok"
