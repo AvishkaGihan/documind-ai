@@ -14,10 +14,12 @@ def _create_token(
     email: str | None = None,
 ) -> str:
     settings = get_settings()
+    issued_at = datetime.now(UTC)
     expires_at = datetime.now(UTC) + expires_delta
-    payload: dict[str, str | datetime] = {
+    payload: dict[str, str | datetime | int] = {
         "sub": subject,
         "type": token_type,
+        "iat": int(issued_at.timestamp()),
         "exp": expires_at,
     }
     if email is not None:
