@@ -23,3 +23,13 @@ class TokenPair(BaseModel):
 class SignUpResponse(BaseModel):
     user: UserPublic
     tokens: TokenPair
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12)
+
+
+class LoginResponse(BaseModel):
+    user: UserPublic
+    tokens: TokenPair
