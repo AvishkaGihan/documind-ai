@@ -1,7 +1,11 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.routers.auth import router as auth_router
+from app.routers.errors import build_error_detail
 
 settings = get_settings()
 
@@ -15,6 +19,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(_, exc: RequestValidationError) -> JSONResponse:
+    field_name: str | None = None
+    for error in exc.errors():
+        location = error.get("loc", ())
+        if len(location) >= 2 and location[0] == "body":
+            field_name = str(location[-1])
+            break
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": build_error_detail(
+                code="VALIDATION_ERROR",
+                message="Invalid request payload.",
+                field=field_name,
+            )
+        },
+    )
+
+
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
 
 @app.get("/health", tags=["health"])

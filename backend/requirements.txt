@@ -8,6 +8,7 @@ pydantic[email]
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt<5
 boto3
 aiofiles
 sqlalchemy[asyncio]
