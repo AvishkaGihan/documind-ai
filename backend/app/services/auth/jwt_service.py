@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
-from jose import jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.config import get_settings
 
@@ -37,3 +38,26 @@ def create_refresh_token(subject: str, email: str | None = None) -> str:
     settings = get_settings()
     expiry = timedelta(days=settings.jwt_refresh_token_expires_days)
     return _create_token(subject=subject, token_type="refresh", expires_delta=expiry, email=email)
+
+
+def create_password_reset_token(subject: str, email: str | None = None) -> str:
+    settings = get_settings()
+    expiry = timedelta(minutes=settings.password_reset_token_expires_minutes)
+    return _create_token(subject=subject, token_type="reset", expires_delta=expiry, email=email)
+
+
+def decode_password_reset_token(token: str) -> UUID:
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[ALGORITHM])
+    except (ExpiredSignatureError, JWTError) as exc:
+        raise ValueError("Invalid or expired reset token") from exc
+
+    if payload.get("type") != "reset":
+        raise ValueError("Invalid or expired reset token")
+
+    subject = payload.get("sub")
+    try:
+        return UUID(str(subject))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid or expired reset token") from exc
