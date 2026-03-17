@@ -1,4 +1,5 @@
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
+import 'package:documind_ai/features/auth/screens/auth_bootstrap_screen.dart';
 import 'package:documind_ai/features/auth/screens/login_screen.dart';
 import 'package:documind_ai/features/auth/screens/signup_screen.dart';
 import 'package:documind_ai/features/chat/screens/chat_screen.dart';
@@ -8,7 +9,7 @@ import 'package:documind_ai/shared/widgets/app_scaffold.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-final initialLocationProvider = Provider<String>((ref) => '/library');
+final initialLocationProvider = Provider<String>((ref) => '/');
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final initialLocation = ref.watch(initialLocationProvider);
@@ -18,13 +19,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: initialLocation,
     redirect: (context, state) {
       final location = state.matchedLocation;
-      final isAuthenticated = authState.value?.isAuthenticated ?? false;
+      final isAuthenticated = authState.asData?.value.isAuthenticated ?? false;
+      final isResolvingAuth = authState.isLoading;
       final isPublicRoute =
-          location == '/auth/login' || location == '/auth/signup';
+          location == '/auth/login' ||
+          location == '/auth/signup' ||
+          location == '/';
       final isProtectedRoute =
           location == '/library' ||
           location.startsWith('/chat/') ||
           location == '/settings';
+
+      if (isResolvingAuth) {
+        return location == '/' ? null : '/';
+      }
+
+      if (location == '/') {
+        return isAuthenticated ? '/library' : '/auth/login';
+      }
 
       if (!isAuthenticated && isProtectedRoute) {
         return '/auth/login';
@@ -36,6 +48,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const AuthBootstrapScreen(),
+      ),
       GoRoute(
         path: '/auth/login',
         builder: (context, state) => const LoginScreen(),
