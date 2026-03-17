@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(default="replace-with-strong-secret", alias="JWT_SECRET_KEY")
     jwt_access_token_expires_hours: int = Field(default=24, alias="JWT_ACCESS_TOKEN_EXPIRES_HOURS")
     jwt_refresh_token_expires_days: int = Field(default=7, alias="JWT_REFRESH_TOKEN_EXPIRES_DAYS")
+    password_reset_token_expires_minutes: int = Field(
+        default=30,
+        alias="PASSWORD_RESET_TOKEN_EXPIRES_MINUTES",
+    )
+    password_reset_frontend_url: str = Field(
+        default="http://localhost:3000/reset-password",
+        alias="PASSWORD_RESET_FRONTEND_URL",
+    )
     cors_allowed_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
@@ -27,6 +35,11 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = Field(default="", alias="AWS_SECRET_ACCESS_KEY")
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
     s3_bucket_name: str = Field(default="", alias="S3_BUCKET_NAME")
+    smtp_host: str = Field(default="", alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: str = Field(default="", alias="SMTP_USERNAME")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="", alias="SMTP_FROM_EMAIL")
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_session
@@ -8,10 +8,18 @@ from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    PasswordResetResponse,
     SignUpRequest,
     SignUpResponse,
 )
-from app.services.auth_service import AuthService, EmailAlreadyExistsError, InvalidCredentialsError
+from app.services.auth_service import (
+    AuthService,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    InvalidResetTokenError,
+)
 
 router = APIRouter()
 async_session_dependency = Depends(get_async_session)
@@ -63,3 +71,42 @@ async def logout(
     service = AuthService(session)
     await service.logout(current_user)
     return LogoutResponse(status="ok")
+
+
+@router.post(
+    "/reset-password",
+    response_model=PasswordResetResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def request_password_reset(
+    payload: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = async_session_dependency,
+) -> PasswordResetResponse:
+    service = AuthService(session)
+    await service.request_password_reset(email=payload.email, background_tasks=background_tasks)
+    return PasswordResetResponse(status="ok")
+
+
+@router.post(
+    "/reset-password/confirm",
+    response_model=PasswordResetResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    session: AsyncSession = async_session_dependency,
+) -> PasswordResetResponse:
+    service = AuthService(session)
+    try:
+        await service.confirm_password_reset(token=payload.token, new_password=payload.new_password)
+    except InvalidResetTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=build_error_detail(
+                code="INVALID_RESET_TOKEN",
+                message="Invalid or expired reset token.",
+            ),
+        ) from exc
+
+    return PasswordResetResponse(status="ok")

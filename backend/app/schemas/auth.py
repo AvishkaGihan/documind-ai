@@ -37,3 +37,16 @@ class LoginResponse(BaseModel):
 
 class LogoutResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=8)
+    new_password: str = Field(min_length=12)
+
+
+class PasswordResetResponse(BaseModel):
+    status: Literal["ok"] = "ok"
