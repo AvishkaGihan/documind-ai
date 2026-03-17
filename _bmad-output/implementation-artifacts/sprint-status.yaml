@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-17T11:48:09+05:30"
+last_updated: "2026-03-17T13:19:45+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -49,13 +49,13 @@ development_status:
   1-4-set-up-database-models-and-alembic-migrations: done
   1-5-configure-cicd-pipeline-with-github-actions: done
   epic-1-retrospective: done
-  epic-2: in-progress
+  epic-2: done
   2-1-user-registration-api-endpoint: done
   2-2-user-login-api-endpoint: done
   2-3-jwt-authentication-middleware-and-logout: done
   2-4-password-reset-via-email: done
   2-5-flutter-authentication-screens-and-token-management: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
   epic-3: backlog
   3-1-pdf-upload-api-and-cloud-storage: backlog
   3-2-document-processing-pipeline-text-extraction-and-chunking: backlog
