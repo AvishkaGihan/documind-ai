@@ -104,7 +104,7 @@ class AuthService:
 
     def _build_password_reset_link(self, token: str) -> str:
         settings = get_settings()
-        parts = urlsplit(settings.password0_reset_frontend_url)
+        parts = urlsplit(settings.password_reset_frontend_url)
         query = dict(parse_qsl(parts.query, keep_blank_values=True))
         query["token"] = token
         return urlunsplit(
