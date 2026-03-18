@@ -12,8 +12,10 @@ from app.repositories.document_repository import (
     update_document_status,
 )
 from app.services.processing.chunker import Chunker
+from app.services.processing.embedder import Embedder
 from app.services.processing.extractor import ExtractionError, Extractor
 from app.services.storage_service import StorageService
+from app.services.vector_service import VectorService
 
 
 async def process_document_pipeline(
@@ -23,9 +25,12 @@ async def process_document_pipeline(
     storage_service: StorageService | None = None,
     extractor: Extractor | None = None,
     chunker: Chunker | None = None,
+    embedder: Embedder | None = None,
+    vector_service: VectorService | None = None,
 ) -> None:
     extractor = extractor or Extractor()
     chunker = chunker or Chunker()
+    embedder = embedder or Embedder()
     storage = storage_service or StorageService()
 
     async with session_factory() as session:
@@ -55,8 +60,44 @@ async def process_document_pipeline(
                 status=DocumentStatus.CHUNKING,
                 error_message=None,
             )
-            # Story 3.2 stops after extraction/chunking; embedding/storage are in Story 3.3.
-            chunker.chunk_pages(document_id=document_id, pages=pages)
+            chunks = chunker.chunk_pages(document_id=document_id, pages=pages)
+
+            await update_document_status(
+                session,
+                document_id=document_id,
+                status=DocumentStatus.EMBEDDING,
+                error_message=None,
+            )
+            active_vector_service = vector_service or VectorService()
+
+            try:
+                embeddings = await embedder.embed_chunks(chunks=chunks)
+                await active_vector_service.upsert_chunks(
+                    user_id=document.user_id,
+                    document_id=document_id,
+                    chunks=chunks,
+                    embeddings=embeddings,
+                )
+            except Exception as exc:
+                await _cleanup_document_vectors(
+                    vector_service=active_vector_service,
+                    user_id=document.user_id,
+                    document_id=document_id,
+                )
+                await update_document_status(
+                    session,
+                    document_id=document_id,
+                    status=DocumentStatus.ERROR,
+                    error_message=f"Embedding stage failed: {exc}",
+                )
+                return
+
+            await update_document_status(
+                session,
+                document_id=document_id,
+                status=DocumentStatus.READY,
+                error_message=None,
+            )
         except ExtractionError as exc:
             await update_document_status(
                 session,
@@ -71,3 +112,19 @@ async def process_document_pipeline(
                 status=DocumentStatus.ERROR,
                 error_message="Document processing failed.",
             )
+
+
+async def _cleanup_document_vectors(
+    *,
+    vector_service: VectorService,
+    user_id: UUID,
+    document_id: UUID,
+) -> None:
+    try:
+        await vector_service.delete_document_collection(
+            user_id=user_id,
+            document_id=document_id,
+        )
+    except Exception:
+        # Best-effort cleanup should not hide the original processing failure.
+        return
