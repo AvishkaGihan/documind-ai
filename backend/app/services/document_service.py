@@ -36,7 +36,7 @@ class DocumentService:
         *,  
         user_id: UUID,
         upload_file: UploadFile,
-    ) -> DocumentPublic:
+    ) -> tuple[DocumentPublic, UUID]:
         file_size = await self._validate_pdf_and_get_size(upload_file)
         document_id = uuid4()
 
@@ -56,7 +56,7 @@ class DocumentService:
             page_count=0,
             status=DocumentStatus.PROCESSING,
         )
-        return DocumentPublic.model_validate(document)
+        return DocumentPublic.model_validate(document), document.id
 
     async def _validate_pdf_and_get_size(self, upload_file: UploadFile) -> int:
         await upload_file.seek(0)

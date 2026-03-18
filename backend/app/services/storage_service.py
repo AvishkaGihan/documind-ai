@@ -35,6 +35,9 @@ class StorageService:
         )
         return object_key
 
+    async def download_pdf_bytes(self, *, object_key: str) -> bytes:
+        return await anyio.to_thread.run_sync(self._download_pdf_bytes, object_key)
+
     def _upload_fileobj(self, fileobj: BinaryIO, object_key: str, content_type: str) -> None:
         fileobj.seek(0)
         self._client.upload_fileobj(
@@ -43,3 +46,8 @@ class StorageService:
             object_key,
             ExtraArgs={"ContentType": content_type or "application/pdf"},
         )
+
+    def _download_pdf_bytes(self, object_key: str) -> bytes:
+        response = self._client.get_object(Bucket=self._bucket_name, Key=object_key)
+        body = response["Body"]
+        return body.read()

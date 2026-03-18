@@ -39,6 +39,7 @@ class Document(Base):
         default=DocumentStatus.PROCESSING,
         nullable=False,
     )
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
