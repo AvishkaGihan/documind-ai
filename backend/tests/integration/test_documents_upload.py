@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.models.document import Document, DocumentStatus
+from app.routers import documents as documents_router
 from app.services.storage_service import StorageService
 
 
@@ -49,6 +50,15 @@ def test_upload_valid_pdf_returns_created_and_persists_document(
 
     monkeypatch.setattr(StorageService, "upload_pdf", _fake_upload_pdf)
 
+    async def _fake_process_document_pipeline(*, document_id):
+        assert str(document_id)
+
+    monkeypatch.setattr(
+        documents_router,
+        "process_document_pipeline",
+        _fake_process_document_pipeline,
+    )
+
     headers = _auth_headers(client, "upload-success@example.com")
     filename = "my-reference-guide.pdf"
     response = client.post(
@@ -74,6 +84,7 @@ def test_upload_valid_pdf_returns_created_and_persists_document(
             assert document.page_count == 0
             assert document.file_size > 0
             assert document.file_path.endswith(".pdf")
+            assert document.error_message is None
 
     asyncio.run(_assert_document_saved())
 

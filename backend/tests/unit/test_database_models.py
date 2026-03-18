@@ -1,7 +1,7 @@
 import importlib
 from pathlib import Path
 
-from sqlalchemy import JSON
+from sqlalchemy import JSON, String
 from sqlalchemy import Enum as SAEnum
 
 from app.config import get_settings
@@ -39,6 +39,10 @@ def test_document_status_enum_values_and_citations_column_type() -> None:
 
     citations_column = message_module.Message.__table__.c.citations
     assert isinstance(citations_column.type, JSON)
+
+    error_message_column = document_module.Document.__table__.c.error_message
+    assert isinstance(error_message_column.type, String)
+    assert error_message_column.nullable is True
 
 
 def test_enum_columns_are_sqlalchemy_enums() -> None:

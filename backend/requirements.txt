@@ -17,6 +17,7 @@ alembic
 asyncpg
 slowapi
 structlog
+pypdf==6.9.1
 pytest
 pytest-asyncio
 httpx
