@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers.auth import router as auth_router
+from app.routers.documents import router as documents_router
 from app.routers.errors import build_error_detail
 
 settings = get_settings()
@@ -43,6 +44,7 @@ async def request_validation_exception_handler(_, exc: RequestValidationError) -
 
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(documents_router, prefix="/api/v1/documents", tags=["documents"])
 
 
 @app.get("/health", tags=["health"])
