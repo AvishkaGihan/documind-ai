@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document, DocumentStatus
@@ -52,6 +52,46 @@ async def get_document_for_user(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def list_documents_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    page: int,
+    page_size: int,
+    search: str | None = None,
+) -> list[Document]:
+    query = select(Document).where(Document.user_id == user_id)
+
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(func.lower(Document.title).like(search_term))
+
+    offset = (page - 1) * page_size
+    query = query.order_by(
+        Document.created_at.desc(),
+        Document.id.desc(),
+    ).offset(offset).limit(page_size)
+
+    result = await session.execute(query)
+    return list(result.scalars().all())
+
+
+async def count_documents_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    search: str | None = None,
+) -> int:
+    query = select(func.count()).select_from(Document).where(Document.user_id == user_id)
+
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(func.lower(Document.title).like(search_term))
+
+    result = await session.execute(query)
+    return int(result.scalar_one())
 
 
 async def update_document_status(

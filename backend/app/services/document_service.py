@@ -5,8 +5,13 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import DocumentStatus
-from app.repositories.document_repository import create_document, get_document_for_user
-from app.schemas.documents import DocumentPublic
+from app.repositories.document_repository import (
+    count_documents_for_user,
+    create_document,
+    get_document_for_user,
+    list_documents_for_user,
+)
+from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.services.storage_service import StorageService
 
 
@@ -101,3 +106,30 @@ class DocumentService:
             raise DocumentNotFoundError
 
         return DocumentPublic.model_validate(document)
+
+    async def list_documents_for_user(
+        self,
+        *,
+        user_id: UUID,
+        page: int,
+        page_size: int,
+        search: str | None = None,
+    ) -> DocumentListResponse:
+        documents = await list_documents_for_user(
+            self._session,
+            user_id=user_id,
+            page=page,
+            page_size=page_size,
+            search=search,
+        )
+        total = await count_documents_for_user(
+            self._session,
+            user_id=user_id,
+            search=search,
+        )
+        return DocumentListResponse(
+            items=[DocumentPublic.model_validate(document) for document in documents],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
