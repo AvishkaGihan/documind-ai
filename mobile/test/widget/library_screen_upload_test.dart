@@ -26,6 +26,17 @@ void main() {
         onProgress(20, 100);
         return completer.future;
       },
+      getHandler: (documentId) async {
+        return UploadedDocument(
+          id: documentId,
+          title: 'report',
+          fileSize: 4096,
+          pageCount: 2,
+          status: 'extracting',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 19),
+        );
+      },
     );
 
     await tester.pumpWidget(
@@ -56,6 +67,7 @@ void main() {
         fileSize: 4096,
         pageCount: 2,
         status: 'processing',
+        errorMessage: null,
         createdAt: DateTime.utc(2026, 3, 19),
       ),
     );
@@ -87,6 +99,18 @@ void main() {
           fileSize: 2048,
           pageCount: 1,
           status: 'processing',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 19),
+        );
+      },
+      getHandler: (documentId) async {
+        return UploadedDocument(
+          id: documentId,
+          title: 'retry',
+          fileSize: 2048,
+          pageCount: 1,
+          status: 'chunking',
+          errorMessage: null,
           createdAt: DateTime.utc(2026, 3, 19),
         );
       },
@@ -136,10 +160,14 @@ typedef _UploadHandler =
       required void Function(int sent, int total) onProgress,
     });
 
+typedef _GetHandler = Future<UploadedDocument> Function(String documentId);
+
 class _FakeDocumentsApi extends DocumentsApi {
-  _FakeDocumentsApi({required this.uploadHandler}) : super(Dio());
+  _FakeDocumentsApi({required this.uploadHandler, required this.getHandler})
+    : super(Dio());
 
   final _UploadHandler uploadHandler;
+  final _GetHandler getHandler;
 
   @override
   Future<UploadedDocument> uploadDocument({
@@ -147,6 +175,11 @@ class _FakeDocumentsApi extends DocumentsApi {
     required void Function(int sent, int total) onProgress,
   }) async {
     return uploadHandler(file: file, onProgress: onProgress);
+  }
+
+  @override
+  Future<UploadedDocument> getDocumentById(String documentId) async {
+    return getHandler(documentId);
   }
 }
 

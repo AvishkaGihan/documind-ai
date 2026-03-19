@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-19T00:28:20+05:30"
+last_updated: "2026-03-19T13:10:46+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -61,7 +61,7 @@ development_status:
   3-2-document-processing-pipeline-text-extraction-and-chunking: done
   3-3-embedding-generation-and-vector-storage: done
   3-4-flutter-document-upload-ui-with-progress: done
-  3-5-document-processing-status-tracking-and-animation: backlog
+  3-5-document-processing-status-tracking-and-animation: done
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-document-library-api-endpoints: backlog

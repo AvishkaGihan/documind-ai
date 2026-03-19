@@ -12,6 +12,7 @@ class DocumentPublic(BaseModel):
     file_size: int
     page_count: int
     status: DocumentStatus
+    error_message: str | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
