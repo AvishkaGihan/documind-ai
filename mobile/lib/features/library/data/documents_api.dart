@@ -52,6 +52,38 @@ class DocumentsApi {
     }
   }
 
+  Future<DocumentListResponse> getDocuments({
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/documents',
+        queryParameters: <String, dynamic>{'page': page, 'page_size': pageSize},
+      );
+
+      final body = response.data;
+      if (body == null) {
+        throw const LibraryApiError(
+          code: 'EMPTY_RESPONSE',
+          message: 'Document list returned no data.',
+        );
+      }
+
+      return DocumentListResponse.fromJson(body);
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
+  Future<void> deleteDocument(String documentId) async {
+    try {
+      await _dio.delete<void>('/api/v1/documents/$documentId');
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
   Future<MultipartFile> _buildMultipart(SelectedPdfFile file) async {
     if (file.path != null) {
       return MultipartFile.fromFile(file.path!, filename: file.name);

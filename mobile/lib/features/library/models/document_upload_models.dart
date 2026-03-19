@@ -59,6 +59,35 @@ class UploadedDocument {
   final DateTime createdAt;
 }
 
+class DocumentListResponse {
+  const DocumentListResponse({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory DocumentListResponse.fromJson(Map<String, dynamic> json) {
+    final itemsJson = (json['items'] as List<dynamic>? ?? <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+
+    return DocumentListResponse(
+      items: itemsJson
+          .map((item) => UploadedDocument.fromJson(item))
+          .toList(growable: false),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      pageSize: (json['page_size'] as num?)?.toInt() ?? 20,
+    );
+  }
+
+  final List<UploadedDocument> items;
+  final int total;
+  final int page;
+  final int pageSize;
+}
+
 enum UploadCardPhase {
   idle,
   uploading,

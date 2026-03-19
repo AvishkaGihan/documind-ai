@@ -181,6 +181,19 @@ class _FakeDocumentsApi extends DocumentsApi {
   Future<UploadedDocument> getDocumentById(String documentId) async {
     return getHandler(documentId);
   }
+
+  @override
+  Future<DocumentListResponse> getDocuments({
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    return const DocumentListResponse(
+      items: <UploadedDocument>[],
+      total: 0,
+      page: 1,
+      pageSize: 100,
+    );
+  }
 }
 
 class _FakePdfFilePickerService implements PdfFilePickerService {
