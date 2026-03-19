@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document, DocumentStatus
@@ -126,3 +126,18 @@ async def update_document_page_count(
     await session.commit()
     await session.refresh(document)
     return document
+
+
+async def delete_document_for_user(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    user_id: UUID,
+) -> int:
+    result = await session.execute(
+        delete(Document).where(
+            Document.id == document_id,
+            Document.user_id == user_id,
+        )
+    )
+    return int(result.rowcount or 0)

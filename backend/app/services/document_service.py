@@ -1,18 +1,28 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import DocumentStatus
+from app.repositories.conversation_repository import (
+    delete_conversations_for_document,
+    delete_messages_for_conversation_ids,
+    list_conversation_ids_for_document,
+)
 from app.repositories.document_repository import (
     count_documents_for_user,
     create_document,
+    delete_document_for_user,
     get_document_for_user,
     list_documents_for_user,
 )
 from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.services.storage_service import StorageService
+
+if TYPE_CHECKING:
+    from app.services.vector_service import VectorService
 
 
 class FileTooLargeError(Exception):
@@ -27,6 +37,10 @@ class DocumentNotFoundError(Exception):
     """Raised when a document does not exist or is not owned by the user."""
 
 
+class DocumentDeletionError(Exception):
+    """Raised when external resource cleanup fails during document deletion."""
+
+
 class DocumentService:
     MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
     READ_CHUNK_SIZE_BYTES = 1024 * 1024
@@ -36,9 +50,23 @@ class DocumentService:
         self,
         session: AsyncSession,
         storage_service: StorageService | None = None,
+        vector_service: VectorService | None = None,
     ) -> None:
         self._session = session
-        self._storage_service = storage_service or StorageService()
+        self._storage_service = storage_service
+        self._vector_service = vector_service
+
+    def _get_storage_service(self) -> StorageService:
+        if self._storage_service is None:
+            self._storage_service = StorageService()
+        return self._storage_service
+
+    def _get_vector_service(self) -> VectorService:
+        if self._vector_service is None:
+            from app.services.vector_service import VectorService
+
+            self._vector_service = VectorService()
+        return self._vector_service
 
     async def upload_document_for_user(
         self,
@@ -49,7 +77,7 @@ class DocumentService:
         file_size = await self._validate_pdf_and_get_size(upload_file)
         document_id = uuid4()
 
-        file_path = await self._storage_service.upload_pdf(
+        file_path = await self._get_storage_service().upload_pdf(
             user_id=user_id,
             document_id=document_id,
             fileobj=upload_file.file,
@@ -133,3 +161,47 @@ class DocumentService:
             page=page,
             page_size=page_size,
         )
+
+    async def delete_document_for_user(self, *, user_id: UUID, document_id: UUID) -> None:
+        document = await get_document_for_user(
+            self._session,
+            document_id=document_id,
+            user_id=user_id,
+        )
+        if document is None:
+            raise DocumentNotFoundError
+
+        file_path = document.file_path
+
+        try:
+            await self._get_vector_service().delete_document_collection(
+                user_id=user_id,
+                document_id=document_id,
+            )
+            await self._get_storage_service().delete_pdf(object_key=file_path)
+        except Exception as exc:  # pragma: no cover - defensive conversion boundary
+            raise DocumentDeletionError from exc
+
+        conversation_ids = await list_conversation_ids_for_document(
+            self._session,
+            document_id=document_id,
+        )
+        await delete_messages_for_conversation_ids(
+            self._session,
+            conversation_ids=conversation_ids,
+        )
+        await delete_conversations_for_document(
+            self._session,
+            document_id=document_id,
+        )
+
+        deleted_rows = await delete_document_for_user(
+            self._session,
+            document_id=document_id,
+            user_id=user_id,
+        )
+        if deleted_rows != 1:
+            await self._session.rollback()
+            raise DocumentNotFoundError
+
+        await self._session.commit()

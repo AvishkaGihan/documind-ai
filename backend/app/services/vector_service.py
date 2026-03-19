@@ -16,7 +16,7 @@ class VectorServiceError(Exception):
 
 class VectorService:
     def __init__(self, *, client: chromadb.ClientAPI | None = None) -> None:
-        self._client = client or self._build_default_client()
+        self._client = client
 
     async def upsert_chunks(
         self,
@@ -85,7 +85,7 @@ class VectorService:
         documents: list[str],
         metadatas: list[dict[str, int | str]],
     ) -> None:
-        collection = self._client.get_or_create_collection(name=collection_name)
+        collection = self._get_client().get_or_create_collection(name=collection_name)
         collection.upsert(
             ids=ids,
             embeddings=embeddings,
@@ -94,7 +94,13 @@ class VectorService:
         )
 
     def _delete_collection_sync(self, collection_name: str) -> None:
-        existing = self._client.list_collections()
+        client = self._get_client()
+        existing = client.list_collections()
         existing_names = [item if isinstance(item, str) else item.name for item in existing]
         if collection_name in existing_names:
-            self._client.delete_collection(name=collection_name)
+            client.delete_collection(name=collection_name)
+
+    def _get_client(self) -> chromadb.ClientAPI:
+        if self._client is None:
+            self._client = self._build_default_client()
+        return self._client
