@@ -16,3 +16,10 @@ class DocumentPublic(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentPublic]
+    total: int
+    page: int
+    page_size: int

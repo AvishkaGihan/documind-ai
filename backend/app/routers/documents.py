@@ -1,13 +1,22 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
-from app.schemas.documents import DocumentPublic
+from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.services.document_service import (
     DocumentNotFoundError,
     DocumentService,
@@ -52,6 +61,23 @@ async def upload_document(
                 message="Uploaded file exceeds the 50 MB limit",
             ),
         ) from exc
+
+
+@router.get("", response_model=DocumentListResponse)
+async def list_documents(
+    current_user: CurrentUser,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1),
+    search: str | None = Query(default=None),
+    session: AsyncSession = async_session_dependency,
+) -> DocumentListResponse:
+    service = DocumentService(session)
+    return await service.list_documents_for_user(
+        user_id=current_user.id,
+        page=page,
+        page_size=page_size,
+        search=search,
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentPublic)
