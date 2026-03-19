@@ -11,15 +11,42 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class LibraryScreen extends ConsumerWidget {
+enum LibrarySortMode { date, name, status }
+
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  bool _isSearching = false;
+  String _searchQuery = '';
+  LibrarySortMode _sortMode = LibrarySortMode.date;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
     final uploadState = ref.watch(documentUploadControllerProvider);
     final documentsAsync = ref.watch(documentListProvider);
+    final isSearching = _isSearching;
+    final searchQuery = _searchQuery;
+    final sortMode = _sortMode;
 
     ref.listen<DocumentUploadState>(documentUploadControllerProvider, (
       previous,
@@ -62,7 +89,50 @@ class LibraryScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Document Library')),
+      appBar: AppBar(
+        title: const Text('Document Library'),
+        actions: [
+          Semantics(
+            button: true,
+            label: isSearching ? 'Close search' : 'Search documents',
+            child: IconButton(
+              key: const Key('library-search-button'),
+              tooltip: isSearching ? 'Close search' : 'Search',
+              onPressed: () {
+                if (isSearching) {
+                  setState(() {
+                    _searchQuery = '';
+                    _isSearching = false;
+                  });
+                  _searchController.clear();
+                  return;
+                }
+                setState(() {
+                  _isSearching = true;
+                });
+              },
+              icon: Icon(isSearching ? Icons.close : Icons.search),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Sort documents',
+            child: IconButton(
+              key: const Key('library-sort-button'),
+              tooltip: 'Sort',
+              onPressed: () async {
+                final selected = await _showSortOptions(context, sortMode);
+                if (selected != null && context.mounted) {
+                  setState(() {
+                    _sortMode = selected;
+                  });
+                }
+              },
+              icon: const Icon(Icons.sort),
+            ),
+          ),
+        ],
+      ),
       backgroundColor: tokens.colors.surfacePrimary,
       floatingActionButton: Semantics(
         button: true,
@@ -79,29 +149,61 @@ class LibraryScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => ref.read(documentListProvider.notifier).refresh(),
         child: documentsAsync.when(
-          data: (response) => _LibraryContent(
-            documents: response.items,
-            uploadState: uploadState,
-            onUploadTap: () {
-              ref
-                  .read(documentUploadControllerProvider.notifier)
-                  .pickAndUpload();
-            },
-            onUploadRetry: () {
-              ref.read(documentUploadControllerProvider.notifier).retryUpload();
-            },
-            onUploadReadyTap: uploadState.uploadedDocument == null
-                ? null
-                : () {
-                    context.go('/chat/${uploadState.uploadedDocument!.id}');
-                  },
-            onDocumentTap: (document) {
-              context.go('/chat/${document.id}');
-            },
-            onDocumentLongPress: (document) {
-              _showDocumentActions(context, ref, document);
-            },
-          ),
+          data: (response) {
+            final visibleDocuments = _applySearchAndSort(
+              response.items,
+              searchQuery,
+              sortMode,
+            );
+
+            return _LibraryContent(
+              documents: visibleDocuments,
+              hasAnyDocuments: response.items.isNotEmpty,
+              isSearching: isSearching,
+              searchQuery: searchQuery,
+              onSearchQueryChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              searchController: _searchController,
+              onClearSearch: () {
+                setState(() {
+                  _searchQuery = '';
+                });
+                _searchController.clear();
+              },
+              onCloseSearch: () {
+                setState(() {
+                  _searchQuery = '';
+                  _isSearching = false;
+                });
+                _searchController.clear();
+              },
+              uploadState: uploadState,
+              onUploadTap: () {
+                ref
+                    .read(documentUploadControllerProvider.notifier)
+                    .pickAndUpload();
+              },
+              onUploadRetry: () {
+                ref
+                    .read(documentUploadControllerProvider.notifier)
+                    .retryUpload();
+              },
+              onUploadReadyTap: uploadState.uploadedDocument == null
+                  ? null
+                  : () {
+                      context.go('/chat/${uploadState.uploadedDocument!.id}');
+                    },
+              onDocumentTap: (document) {
+                context.go('/chat/${document.id}');
+              },
+              onDocumentLongPress: (document) {
+                _showDocumentActions(context, ref, document);
+              },
+            );
+          },
           loading: () => ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
@@ -280,11 +382,74 @@ class LibraryScreen extends ConsumerWidget {
         );
     }
   }
+
+  Future<LibrarySortMode?> _showSortOptions(
+    BuildContext context,
+    LibrarySortMode currentMode,
+  ) {
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    return showModalBottomSheet<LibrarySortMode>(
+      context: context,
+      backgroundColor: tokens.colors.surfaceSecondary,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                key: const Key('library-sort-date'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.schedule_outlined),
+                title: const Text('Date (newest first)'),
+                trailing: currentMode == LibrarySortMode.date
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.date),
+              ),
+              ListTile(
+                key: const Key('library-sort-name'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.sort_by_alpha_outlined),
+                title: const Text('Name (A-Z)'),
+                trailing: currentMode == LibrarySortMode.name
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.name),
+              ),
+              ListTile(
+                key: const Key('library-sort-status'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.tune_outlined),
+                title: const Text('Status (processing first)'),
+                trailing: currentMode == LibrarySortMode.status
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.status),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _LibraryContent extends StatelessWidget {
   const _LibraryContent({
     required this.documents,
+    required this.hasAnyDocuments,
+    required this.isSearching,
+    required this.searchQuery,
+    required this.onSearchQueryChanged,
+    required this.searchController,
+    required this.onClearSearch,
+    required this.onCloseSearch,
     required this.uploadState,
     required this.onUploadTap,
     required this.onUploadRetry,
@@ -294,6 +459,13 @@ class _LibraryContent extends StatelessWidget {
   });
 
   final List<UploadedDocument> documents;
+  final bool hasAnyDocuments;
+  final bool isSearching;
+  final String searchQuery;
+  final ValueChanged<String> onSearchQueryChanged;
+  final TextEditingController searchController;
+  final VoidCallback onClearSearch;
+  final VoidCallback onCloseSearch;
   final DocumentUploadState uploadState;
   final VoidCallback onUploadTap;
   final VoidCallback onUploadRetry;
@@ -306,12 +478,49 @@ class _LibraryContent extends StatelessWidget {
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
     final showUploadCard = uploadState.phase != UploadCardPhase.idle;
-    final isEmpty = documents.isEmpty && !showUploadCard;
+    final showNoResults =
+        searchQuery.trim().isNotEmpty && documents.isEmpty && hasAnyDocuments;
+    final isEmpty =
+        !showNoResults &&
+        documents.isEmpty &&
+        !showUploadCard &&
+        !hasAnyDocuments;
+
+    List<Widget> buildSearchHeader() {
+      if (!isSearching) {
+        return const <Widget>[];
+      }
+
+      return <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: TextField(
+            key: const Key('library-search-field'),
+            autofocus: true,
+            onChanged: onSearchQueryChanged,
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search documents',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: searchQuery.isNotEmpty
+                  ? IconButton(
+                      key: const Key('library-clear-search'),
+                      tooltip: 'Clear search',
+                      onPressed: onClearSearch,
+                      icon: const Icon(Icons.clear),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ];
+    }
 
     if (isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          ...buildSearchHeader(),
           const SizedBox(height: AppSpacing.x2l),
           Icon(
             Icons.picture_as_pdf_outlined,
@@ -348,31 +557,55 @@ class _LibraryContent extends StatelessWidget {
               ),
             ),
           ),
+          if (isSearching)
+            Center(
+              child: TextButton(
+                key: const Key('library-close-search'),
+                onPressed: onCloseSearch,
+                child: const Text('Cancel search'),
+              ),
+            ),
         ],
       );
     }
 
-    final itemCount = documents.length + (showUploadCard ? 1 : 0);
-    return ListView.builder(
-      key: const Key('library-document-list'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (showUploadCard && index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: DocumentUploadCard(
-              state: uploadState,
-              onRetry: onUploadRetry,
-              onReadyTap: onUploadReadyTap,
+    final children = <Widget>[
+      ...buildSearchHeader(),
+      if (showUploadCard)
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: DocumentUploadCard(
+            state: uploadState,
+            onRetry: onUploadRetry,
+            onReadyTap: onUploadReadyTap,
+          ),
+        ),
+      if (showNoResults)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Center(
+            child: Column(
+              children: [
+                Text(
+                  'No documents match your search',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: tokens.colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextButton(
+                  key: const Key('library-clear-search-empty'),
+                  onPressed: onClearSearch,
+                  child: const Text('Clear search'),
+                ),
+              ],
             ),
-          );
-        }
-
-        final documentIndex = showUploadCard ? index - 1 : index;
-        final document = documents[documentIndex];
-
-        return Padding(
+          ),
+        ),
+      ...documents.map(
+        (document) => Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Hero(
             tag: 'document-${document.id}',
@@ -382,8 +615,87 @@ class _LibraryContent extends StatelessWidget {
               onLongPress: () => onDocumentLongPress(document),
             ),
           ),
-        );
-      },
+        ),
+      ),
+      if (isSearching)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const Key('library-close-search'),
+            onPressed: onCloseSearch,
+            child: const Text('Cancel search'),
+          ),
+        ),
+    ];
+
+    return ListView(
+      key: const Key('library-document-list'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      children: children,
     );
   }
+}
+
+List<UploadedDocument> _applySearchAndSort(
+  List<UploadedDocument> documents,
+  String query,
+  LibrarySortMode sortMode,
+) {
+  final normalizedQuery = query.trim().toLowerCase();
+
+  final filtered = documents
+      .where(
+        (document) =>
+            normalizedQuery.isEmpty ||
+            document.title.toLowerCase().contains(normalizedQuery),
+      )
+      .toList(growable: false);
+
+  final sorted = filtered.toList(growable: false)
+    ..sort((a, b) {
+      switch (sortMode) {
+        case LibrarySortMode.date:
+          return _compareDateThenId(a, b);
+        case LibrarySortMode.name:
+          final nameCompare = a.title.toLowerCase().compareTo(
+            b.title.toLowerCase(),
+          );
+          if (nameCompare != 0) {
+            return nameCompare;
+          }
+          final dateCompare = _compareDateThenId(a, b);
+          if (dateCompare != 0) {
+            return dateCompare;
+          }
+          return a.id.compareTo(b.id);
+        case LibrarySortMode.status:
+          final statusCompare = _statusGroupOrder(
+            a.status,
+          ).compareTo(_statusGroupOrder(b.status));
+          if (statusCompare != 0) {
+            return statusCompare;
+          }
+          return _compareDateThenId(a, b);
+      }
+    });
+
+  return sorted;
+}
+
+int _statusGroupOrder(String status) {
+  if (status == 'ready') {
+    return 1;
+  }
+  if (status == 'error') {
+    return 2;
+  }
+  return 0;
+}
+
+int _compareDateThenId(UploadedDocument a, UploadedDocument b) {
+  final dateCompare = b.createdAt.compareTo(a.createdAt);
+  if (dateCompare != 0) {
+    return dateCompare;
+  }
+  return a.id.compareTo(b.id);
 }
