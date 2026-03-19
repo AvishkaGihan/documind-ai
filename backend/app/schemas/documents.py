@@ -9,6 +9,8 @@ from app.models.document import DocumentStatus
 class DocumentPublic(BaseModel):
     id: UUID
     title: str
+    file_size: int
+    page_count: int
     status: DocumentStatus
     created_at: datetime
 

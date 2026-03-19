@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
+import 'package:documind_ai/features/auth/data/token_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,14 +22,32 @@ final apiBaseUrlProvider = Provider<String>((ref) {
 
 final dioProvider = Provider<Dio>((ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
+  final tokenStorage = ref.watch(tokenStorageProvider);
 
-  return Dio(
+  final dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
-      headers: const {'Content-Type': 'application/json'},
+      headers: const {'Accept': 'application/json'},
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 20),
       sendTimeout: const Duration(seconds: 20),
     ),
   );
+
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final session = await tokenStorage.readSession();
+        if (session != null && session.accessToken.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+        }
+        if (options.data is FormData) {
+          options.headers.remove(Headers.contentTypeHeader);
+        }
+        handler.next(options);
+      },
+    ),
+  );
+
+  return dio;
 });

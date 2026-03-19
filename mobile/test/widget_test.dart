@@ -66,7 +66,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('Library Screen Placeholder'), findsOneWidget);
+    expect(find.text('Document Library'), findsOneWidget);
     expect(find.byKey(const Key('login-email-field')), findsNothing);
   });
 
@@ -113,7 +113,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Library Screen Placeholder'), findsOneWidget);
+    expect(find.text('Document Library'), findsOneWidget);
 
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
