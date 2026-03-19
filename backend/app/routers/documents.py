@@ -8,6 +8,7 @@ from fastapi import (
     File,
     HTTPException,
     Query,
+    Response,
     UploadFile,
     status,
 )
@@ -18,6 +19,7 @@ from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
 from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.services.document_service import (
+    DocumentDeletionError,
     DocumentNotFoundError,
     DocumentService,
     FileTooLargeError,
@@ -99,5 +101,37 @@ async def get_document(
             detail=build_error_detail(
                 code="DOCUMENT_NOT_FOUND",
                 message="Document not found.",
+            ),
+        ) from exc
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> Response:
+    service = DocumentService(session)
+
+    try:
+        await service.delete_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+    except DocumentDeletionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=build_error_detail(
+                code="DOCUMENT_DELETION_FAILED",
+                message="Failed to delete document resources.",
             ),
         ) from exc

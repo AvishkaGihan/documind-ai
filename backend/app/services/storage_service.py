@@ -3,8 +3,13 @@ from uuid import UUID
 
 import anyio
 import boto3
+from botocore.exceptions import ClientError
 
 from app.config import get_settings
+
+
+class StorageServiceError(Exception):
+    """Raised when storage operations fail."""
 
 
 class StorageService:
@@ -38,6 +43,12 @@ class StorageService:
     async def download_pdf_bytes(self, *, object_key: str) -> bytes:
         return await anyio.to_thread.run_sync(self._download_pdf_bytes, object_key)
 
+    async def delete_pdf(self, *, object_key: str) -> None:
+        try:
+            await anyio.to_thread.run_sync(self._delete_pdf_sync, object_key)
+        except Exception as exc:  # pragma: no cover - defensive conversion boundary
+            raise StorageServiceError(f"Failed to delete PDF from storage: {exc}") from exc
+
     def _upload_fileobj(self, fileobj: BinaryIO, object_key: str, content_type: str) -> None:
         fileobj.seek(0)
         self._client.upload_fileobj(
@@ -51,3 +62,12 @@ class StorageService:
         response = self._client.get_object(Bucket=self._bucket_name, Key=object_key)
         body = response["Body"]
         return body.read()
+
+    def _delete_pdf_sync(self, object_key: str) -> None:
+        try:
+            self._client.delete_object(Bucket=self._bucket_name, Key=object_key)
+        except ClientError as exc:
+            error_code = str(exc.response.get("Error", {}).get("Code", ""))
+            if error_code in {"NoSuchKey", "404", "NotFound"}:
+                return
+            raise
