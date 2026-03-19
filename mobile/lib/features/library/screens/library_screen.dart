@@ -6,6 +6,7 @@ import 'package:documind_ai/features/library/widgets/document_upload_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -98,7 +99,19 @@ class LibraryScreen extends ConsumerWidget {
                 ),
               )
             else
-              DocumentUploadCard(state: uploadState),
+              DocumentUploadCard(
+                state: uploadState,
+                onRetry: () {
+                  ref
+                      .read(documentUploadControllerProvider.notifier)
+                      .retryUpload();
+                },
+                onReadyTap: uploadState.uploadedDocument == null
+                    ? null
+                    : () {
+                        context.go('/chat/${uploadState.uploadedDocument!.id}');
+                      },
+              ),
           ],
         ),
       ),

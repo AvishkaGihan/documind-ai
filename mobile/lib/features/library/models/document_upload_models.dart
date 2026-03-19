@@ -34,6 +34,7 @@ class UploadedDocument {
     required this.fileSize,
     required this.pageCount,
     required this.status,
+    required this.errorMessage,
     required this.createdAt,
   });
 
@@ -44,6 +45,7 @@ class UploadedDocument {
       fileSize: (json['file_size'] as num).toInt(),
       pageCount: (json['page_count'] as num).toInt(),
       status: json['status'] as String,
+      errorMessage: json['error_message'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -53,10 +55,18 @@ class UploadedDocument {
   final int fileSize;
   final int pageCount;
   final String status;
+  final String? errorMessage;
   final DateTime createdAt;
 }
 
-enum UploadCardPhase { idle, uploading, processing, failed }
+enum UploadCardPhase {
+  idle,
+  uploading,
+  processing,
+  ready,
+  processingError,
+  failed,
+}
 
 @immutable
 class DocumentUploadState {

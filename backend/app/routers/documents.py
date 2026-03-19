@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,12 @@ from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
 from app.schemas.documents import DocumentPublic
-from app.services.document_service import DocumentService, FileTooLargeError, InvalidFileTypeError
+from app.services.document_service import (
+    DocumentNotFoundError,
+    DocumentService,
+    FileTooLargeError,
+    InvalidFileTypeError,
+)
 from app.services.processing.pipeline import process_document_pipeline
 
 router = APIRouter()
@@ -44,5 +50,28 @@ async def upload_document(
             detail=build_error_detail(
                 code="FILE_TOO_LARGE",
                 message="Uploaded file exceeds the 50 MB limit",
+            ),
+        ) from exc
+
+
+@router.get("/{document_id}", response_model=DocumentPublic)
+async def get_document(
+    document_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> DocumentPublic:
+    service = DocumentService(session)
+
+    try:
+        return await service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
             ),
         ) from exc

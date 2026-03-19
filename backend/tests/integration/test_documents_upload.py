@@ -75,12 +75,14 @@ def test_upload_valid_pdf_returns_created_and_persists_document(
         "file_size",
         "page_count",
         "status",
+        "error_message",
         "created_at",
     }
     assert body["title"] == "my-reference-guide"
     assert body["file_size"] > 0
     assert body["page_count"] == 0
     assert body["status"] == "processing"
+    assert body["error_message"] is None
     assert body["id"]
     assert body["created_at"]
 

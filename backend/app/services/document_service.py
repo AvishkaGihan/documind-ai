@@ -5,7 +5,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import DocumentStatus
-from app.repositories.document_repository import create_document
+from app.repositories.document_repository import create_document, get_document_for_user
 from app.schemas.documents import DocumentPublic
 from app.services.storage_service import StorageService
 
@@ -16,6 +16,10 @@ class FileTooLargeError(Exception):
 
 class InvalidFileTypeError(Exception):
     """Raised when an uploaded file is not a valid PDF."""
+
+
+class DocumentNotFoundError(Exception):
+    """Raised when a document does not exist or is not owned by the user."""
 
 
 class DocumentService:
@@ -81,3 +85,19 @@ class DocumentService:
             return "document"
         stem = Path(filename).stem.strip()
         return stem or "document"
+
+    async def get_document_for_user(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+    ) -> DocumentPublic:
+        document = await get_document_for_user(
+            self._session,
+            document_id=document_id,
+            user_id=user_id,
+        )
+        if document is None:
+            raise DocumentNotFoundError
+
+        return DocumentPublic.model_validate(document)

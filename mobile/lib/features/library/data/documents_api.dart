@@ -33,6 +33,25 @@ class DocumentsApi {
     }
   }
 
+  Future<UploadedDocument> getDocumentById(String documentId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/documents/$documentId',
+      );
+      final body = response.data;
+      if (body == null) {
+        throw const LibraryApiError(
+          code: 'EMPTY_RESPONSE',
+          message: 'Status check completed but server returned no data.',
+        );
+      }
+
+      return UploadedDocument.fromJson(body);
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
   Future<MultipartFile> _buildMultipart(SelectedPdfFile file) async {
     if (file.path != null) {
       return MultipartFile.fromFile(file.path!, filename: file.name);

@@ -4,9 +4,16 @@ import 'package:documind_ai/features/library/models/document_upload_models.dart'
 import 'package:flutter/material.dart';
 
 class DocumentUploadCard extends StatelessWidget {
-  const DocumentUploadCard({required this.state, super.key});
+  const DocumentUploadCard({
+    required this.state,
+    this.onReadyTap,
+    this.onRetry,
+    super.key,
+  });
 
   final DocumentUploadState state;
+  final VoidCallback? onReadyTap;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +52,25 @@ class DocumentUploadCard extends StatelessWidget {
       ),
     );
 
+    final canOpenChat =
+        state.phase == UploadCardPhase.ready && onReadyTap != null;
+    final wrappedCard = canOpenChat
+        ? InkWell(
+            key: const Key('document-ready-tap-target'),
+            onTap: onReadyTap,
+            borderRadius: BorderRadius.circular(12),
+            child: cardContent,
+          )
+        : cardContent;
+
     if (state.phase == UploadCardPhase.processing) {
-      return _ProcessingGlowContainer(child: cardContent);
+      return _ProcessingGlowContainer(child: wrappedCard);
+    }
+    if (state.phase == UploadCardPhase.ready) {
+      return _ReadyCelebrationContainer(child: wrappedCard);
     }
 
-    return cardContent;
+    return wrappedCard;
   }
 
   Widget _buildStatusRow(BuildContext context) {
@@ -81,11 +102,12 @@ class DocumentUploadCard extends StatelessWidget {
         );
       case UploadCardPhase.processing:
         final doc = state.uploadedDocument;
+        final stage = _stageLabelForStatus(doc?.status, doc?.pageCount ?? 0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Processing...',
+              stage,
               key: const Key('upload-processing-label'),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: tokens.colors.accentAiGlow,
@@ -107,6 +129,54 @@ class DocumentUploadCard extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        );
+      case UploadCardPhase.ready:
+        return Row(
+          children: [
+            Icon(Icons.check_circle, color: tokens.colors.accentSecondary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                '✅ Ready to answer your questions!',
+                key: const Key('upload-ready-label'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.colors.accentSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: tokens.colors.textSecondary),
+          ],
+        );
+      case UploadCardPhase.processingError:
+        final message =
+            state.uploadedDocument?.errorMessage ??
+            'Processing failed. Please try uploading again.';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.error, color: tokens.colors.accentError),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    message,
+                    key: const Key('processing-error-label'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: tokens.colors.accentError,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              key: const Key('processing-retry-button'),
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
           ],
         );
       case UploadCardPhase.failed:
@@ -134,6 +204,12 @@ class DocumentUploadCard extends StatelessWidget {
     if (state.phase == UploadCardPhase.failed) {
       return tokens.colors.accentError;
     }
+    if (state.phase == UploadCardPhase.processingError) {
+      return tokens.colors.accentError;
+    }
+    if (state.phase == UploadCardPhase.ready) {
+      return tokens.colors.accentSecondary;
+    }
     if (state.phase == UploadCardPhase.uploading) {
       return tokens.colors.accentPrimary;
     }
@@ -147,10 +223,30 @@ class DocumentUploadCard extends StatelessWidget {
         return '$title uploading ${progress.toStringAsFixed(0)} percent';
       case UploadCardPhase.processing:
         return '$title uploaded and processing';
+      case UploadCardPhase.ready:
+        return '$title ready for chat';
+      case UploadCardPhase.processingError:
+        return '$title processing failed';
       case UploadCardPhase.failed:
         return '$title upload failed';
       case UploadCardPhase.idle:
         return '$title ready';
+    }
+  }
+
+  String _stageLabelForStatus(String? status, int pageCount) {
+    switch (status) {
+      case 'extracting':
+        if (pageCount > 0) {
+          return '📖 Extracting text... ($pageCount pages)';
+        }
+        return '📖 Extracting text...';
+      case 'chunking':
+        return '🧩 Creating knowledge chunks...';
+      case 'embedding':
+        return '🧠 Building intelligence index...';
+      default:
+        return 'Processing...';
     }
   }
 
@@ -198,6 +294,12 @@ class _ProcessingGlowContainerState extends State<_ProcessingGlowContainer>
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      return widget.child;
+    }
+
     final tokens = Theme.of(context).extension<DocuMindTokens>()!;
 
     return AnimatedBuilder(
@@ -221,6 +323,71 @@ class _ProcessingGlowContainerState extends State<_ProcessingGlowContainer>
                 color: glowColor ?? tokens.colors.accentAiGlow,
                 blurRadius: blur,
                 spreadRadius: spread,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+class _ReadyCelebrationContainer extends StatefulWidget {
+  const _ReadyCelebrationContainer({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ReadyCelebrationContainer> createState() =>
+      _ReadyCelebrationContainerState();
+}
+
+class _ReadyCelebrationContainerState extends State<_ReadyCelebrationContainer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      return widget.child;
+    }
+
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final t = Curves.easeOut.transform(_controller.value);
+        final glow = (1 - t).clamp(0, 1).toDouble();
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: tokens.colors.accentSecondary.withValues(
+                  alpha: 0.40 * glow,
+                ),
+                blurRadius: 8 + (12 * glow),
+                spreadRadius: 0.2 + glow,
               ),
             ],
           ),
