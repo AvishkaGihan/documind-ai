@@ -9,6 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Future<void> pumpFrames(WidgetTester tester, [int count = 6]) async {
+    for (var i = 0; i < count; i += 1) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
   testWidgets('App builds with ProviderScope and router shell', (
     WidgetTester tester,
   ) async {
@@ -111,16 +117,16 @@ void main() {
         ],
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpFrames(tester, 10);
 
     expect(find.text('Document Library'), findsOneWidget);
 
     await tester.tap(find.text('Settings').first);
-    await tester.pumpAndSettle();
+    await pumpFrames(tester, 6);
     expect(find.text('Settings Screen Placeholder'), findsOneWidget);
 
     await tester.tap(find.text('Chat').first);
-    await tester.pumpAndSettle();
+    await pumpFrames(tester, 6);
     expect(find.text('Chat Screen Placeholder: active'), findsOneWidget);
   });
 }
