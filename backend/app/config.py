@@ -28,6 +28,9 @@ class Settings(BaseSettings):
         alias="CORS_ALLOWED_ORIGINS",
     )
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    groq_model_name: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL_NAME")
+    groq_timeout_seconds: int = Field(default=20, alias="GROQ_TIMEOUT_SECONDS")
+    groq_max_retries: int = Field(default=2, alias="GROQ_MAX_RETRIES")
     chroma_host: str = Field(default="localhost", alias="CHROMA_HOST")
     chroma_port: int = Field(default=8001, alias="CHROMA_PORT")
 

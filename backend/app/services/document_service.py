@@ -21,9 +21,11 @@ from app.repositories.document_repository import (
     list_documents_for_user,
 )
 from app.schemas.documents import DocumentListResponse, DocumentPublic
+from app.schemas.qa import AskQuestionResponse
 from app.services.storage_service import StorageService
 
 if TYPE_CHECKING:
+    from app.services.rag_service import RagService
     from app.services.vector_service import VectorService
 
 
@@ -41,6 +43,10 @@ class DocumentNotFoundError(Exception):
 
 class DocumentDeletionError(Exception):
     """Raised when external resource cleanup fails during document deletion."""
+
+
+class DocumentNotReadyError(Exception):
+    """Raised when a document has not completed processing for Q&A."""
 
 
 class DocumentService:
@@ -207,3 +213,33 @@ class DocumentService:
             raise DocumentNotFoundError
 
         await self._session.commit()
+
+    async def ask_question_for_document(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+        question: str,
+        rag_service: RagService | None = None,
+    ) -> AskQuestionResponse:
+        document = await get_document_for_user(
+            self._session,
+            document_id=document_id,
+            user_id=user_id,
+        )
+        if document is None:
+            raise DocumentNotFoundError
+        if document.status != DocumentStatus.READY:
+            raise DocumentNotReadyError
+
+        if rag_service is None:
+            from app.services.rag_service import RagService
+
+            rag_service = RagService()
+
+        active_rag_service = rag_service
+        return await active_rag_service.ask_question(
+            user_id=user_id,
+            document_id=document_id,
+            question=question,
+        )

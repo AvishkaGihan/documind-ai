@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-19T22:57:24+05:30"
+last_updated: "2026-03-20T11:16:21+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -69,8 +69,8 @@ development_status:
   4-3-flutter-document-library-screen: done
   4-4-document-library-search-and-filter: done
   epic-4-retrospective: done
-  epic-5: backlog
-  5-1-rag-pipeline-semantic-retrieval-and-answer-generation-api: backlog
+  epic-5: in-progress
+  5-1-rag-pipeline-semantic-retrieval-and-answer-generation-api: done
   5-2-streaming-answer-endpoint-with-sse: backlog
   5-3-conversation-memory-and-context-management: backlog
   5-4-flutter-chat-screen-with-streaming-answers: backlog
