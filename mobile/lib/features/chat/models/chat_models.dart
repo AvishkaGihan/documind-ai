@@ -119,6 +119,61 @@ class DocumentChatBootstrap {
   bool get isDocumentReady => documentStatus == 'ready';
 }
 
+@immutable
+class ConversationSession {
+  const ConversationSession({
+    required this.id,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory ConversationSession.fromJson(Map<String, dynamic> json) {
+    return ConversationSession(
+      id: json['id'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now().toUtc(),
+      updatedAt:
+          DateTime.tryParse(json['updated_at'] as String? ?? '') ??
+          DateTime.now().toUtc(),
+    );
+  }
+
+  final String id;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+@immutable
+class ConversationListResponse {
+  const ConversationListResponse({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory ConversationListResponse.fromJson(Map<String, dynamic> json) {
+    final itemsJson = (json['items'] as List<dynamic>? ?? <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+
+    return ConversationListResponse(
+      items: itemsJson
+          .map(ConversationSession.fromJson)
+          .toList(growable: false),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      pageSize: (json['page_size'] as num?)?.toInt() ?? 20,
+    );
+  }
+
+  final List<ConversationSession> items;
+  final int total;
+  final int page;
+  final int pageSize;
+}
+
 enum ChatSseEventType { token, citation, done, error }
 
 @immutable

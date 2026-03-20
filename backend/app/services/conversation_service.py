@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 from app.repositories.conversation_repository import (
+    activate_conversation_for_scope,
     create_conversation,
     get_conversation_for_scope,
     get_latest_conversation_for_document,
+    list_conversations_for_scope,
     touch_conversation,
 )
 from app.repositories.message_repository import (
@@ -186,3 +188,34 @@ class ConversationService:
             answer_text=answer_text,
             citations=citations,
         )
+
+    async def list_conversations_for_document(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+    ) -> list[Conversation]:
+        return await list_conversations_for_scope(
+            self._session,
+            user_id=user_id,
+            document_id=document_id,
+        )
+
+    async def activate_conversation(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+        conversation_id: UUID,
+    ) -> Conversation:
+        conversation = await activate_conversation_for_scope(
+            self._session,
+            user_id=user_id,
+            document_id=document_id,
+            conversation_id=conversation_id,
+        )
+        if conversation is None:
+            raise ConversationNotFoundError
+
+        await self._session.commit()
+        return conversation

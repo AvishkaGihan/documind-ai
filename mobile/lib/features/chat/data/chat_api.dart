@@ -83,6 +83,46 @@ class ChatApi {
     }
   }
 
+  Future<void> createNewConversation(String documentId) async {
+    try {
+      await _dio.post<void>('/api/v1/documents/$documentId/conversations/new');
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
+  Future<List<ConversationSession>> listConversations(String documentId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/documents/$documentId/conversations',
+      );
+      final body = response.data;
+      if (body == null) {
+        throw const ChatApiError(
+          code: 'EMPTY_RESPONSE',
+          message: 'Conversation history returned no data.',
+        );
+      }
+
+      return ConversationListResponse.fromJson(body).items;
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
+  Future<void> activateConversation({
+    required String documentId,
+    required String conversationId,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/api/v1/documents/$documentId/conversations/$conversationId/activate',
+      );
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
   ChatApiError _mapError(DioException error) {
     final dynamic data = error.response?.data;
     if (data is Map<String, dynamic>) {
