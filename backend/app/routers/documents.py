@@ -1,3 +1,5 @@
+import asyncio
+from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import UUID
 
@@ -8,17 +10,21 @@ from fastapi import (
     File,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.sse import format_sse_event
 from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
 from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.schemas.qa import AskQuestionRequest, AskQuestionResponse
+from app.services.conversation_service import ConversationService
 from app.services.document_service import (
     DocumentDeletionError,
     DocumentNotFoundError,
@@ -144,12 +150,72 @@ async def delete_document(
 async def ask_document_question(
     document_id: UUID,
     payload: AskQuestionRequest,
+    request: Request,
     current_user: CurrentUser,
     session: AsyncSession = async_session_dependency,
-) -> AskQuestionResponse:
+) -> AskQuestionResponse | StreamingResponse:
     service = DocumentService(session)
+    is_streaming_request = "text/event-stream" in request.headers.get("accept", "").lower()
 
     try:
+        if is_streaming_request:
+            await service.ensure_document_ready_for_question(
+                user_id=current_user.id,
+                document_id=document_id,
+            )
+
+            rag_service = RagService()
+            conversation_service = ConversationService(session)
+
+            async def _stream_events() -> AsyncIterator[str]:
+                answer_parts: list[str] = []
+                citations: list[dict[str, object]] = []
+                emitted_citation_pages: set[int] = set()
+                saw_error = False
+
+                async for event_name, event_payload in rag_service.stream_answer_events(
+                    user_id=current_user.id,
+                    document_id=document_id,
+                    question=payload.question,
+                ):
+                    if event_name == "token":
+                        token = str(event_payload.get("content", ""))
+                        answer_parts.append(token)
+                    elif event_name == "citation":
+                        page = int(event_payload.get("page", 0))
+                        text = str(event_payload.get("text", ""))
+                        if page > 0 and text and page not in emitted_citation_pages:
+                            citations.append({"page_number": page, "text": text})
+                            emitted_citation_pages.add(page)
+                    elif event_name == "error":
+                        saw_error = True
+
+                    yield format_sse_event(event_name, event_payload)
+                    await asyncio.sleep(0)
+
+                    if event_name == "error":
+                        return
+
+                if not saw_error:
+                    assistant_message_id = await conversation_service.persist_stream_completion(
+                        user_id=current_user.id,
+                        document_id=document_id,
+                        question=payload.question,
+                        answer_text="".join(answer_parts).strip(),
+                        citations=citations,
+                    )
+                    yield format_sse_event("done", {"message_id": str(assistant_message_id)})
+
+            return StreamingResponse(
+                _stream_events(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
         return await service.ask_question_for_document(
             user_id=current_user.id,
             document_id=document_id,
