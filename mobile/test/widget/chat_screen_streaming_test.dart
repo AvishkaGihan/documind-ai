@@ -31,7 +31,9 @@ void main() {
           tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
         ],
         child: MaterialApp(
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
           home: const ChatScreen(documentId: 'doc-5'),
         ),
       ),
@@ -79,7 +81,9 @@ void main() {
           tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
         ],
         child: MaterialApp(
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
           home: const ChatScreen(documentId: 'doc-5'),
         ),
       ),
@@ -100,6 +104,47 @@ void main() {
       find.textContaining('Q&A requires an internet connection'),
       findsWidgets,
     );
+  });
+
+  testWidgets('typing indicator supports reduce-motion accessibility mode', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeChatApi();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
+          home: const MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: ChatScreen(documentId: 'doc-5'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.enterText(
+      find.byKey(const Key('chat-input-text-field')),
+      'Need a short answer',
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tap(find.byKey(const Key('chat-send-button')));
+    await tester.pump(const Duration(milliseconds: 80));
+
+    expect(find.byKey(const Key('ai-typing-indicator')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.takeException(), isNull);
   });
 }
 

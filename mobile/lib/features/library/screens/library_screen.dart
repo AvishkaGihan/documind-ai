@@ -7,6 +7,7 @@ import 'package:documind_ai/features/library/providers/document_list_provider.da
 import 'package:documind_ai/features/library/providers/document_upload_controller.dart';
 import 'package:documind_ai/features/library/widgets/document_card.dart';
 import 'package:documind_ai/features/library/widgets/document_upload_card.dart';
+import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -220,13 +221,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             );
           },
           loading: () => ListView(
+            key: const Key('library-loading-skeleton-list'),
             padding: EdgeInsets.all(loadingPadding),
-            children: [
-              const SizedBox(height: AppSpacing.xl),
-              Center(
-                child: CircularProgressIndicator(
-                  color: tokens.colors.accentPrimary,
+            children: const [
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.md),
+                child: LibraryDocumentSkeletonCard(
+                  key: Key('library-loading-skeleton-card-0'),
                 ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.md),
+                child: LibraryDocumentSkeletonCard(
+                  key: Key('library-loading-skeleton-card-1'),
+                ),
+              ),
+              LibraryDocumentSkeletonCard(
+                key: Key('library-loading-skeleton-card-2'),
               ),
             ],
           ),

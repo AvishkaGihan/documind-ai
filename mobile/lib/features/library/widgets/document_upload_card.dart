@@ -1,6 +1,7 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
+import 'package:documind_ai/features/library/widgets/processing_animation.dart';
 import 'package:flutter/material.dart';
 
 class DocumentUploadCard extends StatelessWidget {
@@ -63,9 +64,6 @@ class DocumentUploadCard extends StatelessWidget {
           )
         : cardContent;
 
-    if (state.phase == UploadCardPhase.processing) {
-      return _ProcessingGlowContainer(child: wrappedCard);
-    }
     if (state.phase == UploadCardPhase.ready) {
       return _ReadyCelebrationContainer(child: wrappedCard);
     }
@@ -119,17 +117,13 @@ class DocumentUploadCard extends StatelessWidget {
         );
       case UploadCardPhase.processing:
         final doc = state.uploadedDocument;
-        final stage = _stageLabelForStatus(doc?.status, doc?.pageCount ?? 0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              stage,
+            ProcessingAnimation(
               key: const Key('upload-processing-label'),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: tokens.colors.accentAiGlow,
-                fontWeight: FontWeight.w600,
-              ),
+              status: doc?.status ?? 'processing',
+              pageCount: doc?.pageCount,
             ),
             if (doc != null) ...[
               const SizedBox(height: AppSpacing.sm),
@@ -253,22 +247,6 @@ class DocumentUploadCard extends StatelessWidget {
     }
   }
 
-  String _stageLabelForStatus(String? status, int pageCount) {
-    switch (status) {
-      case 'extracting':
-        if (pageCount > 0) {
-          return '📖 Extracting text... ($pageCount pages)';
-        }
-        return '📖 Extracting text...';
-      case 'chunking':
-        return '🧩 Creating knowledge chunks...';
-      case 'embedding':
-        return '🧠 Building intelligence index...';
-      default:
-        return 'Processing...';
-    }
-  }
-
   String _formatFileSize(int bytes) {
     if (bytes < 1024) {
       return '$bytes B';
@@ -279,76 +257,6 @@ class DocumentUploadCard extends StatelessWidget {
     }
     final mb = kb / 1024;
     return '${mb.toStringAsFixed(1)} MB';
-  }
-}
-
-class _ProcessingGlowContainer extends StatefulWidget {
-  const _ProcessingGlowContainer({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_ProcessingGlowContainer> createState() =>
-      _ProcessingGlowContainerState();
-}
-
-class _ProcessingGlowContainerState extends State<_ProcessingGlowContainer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (reduceMotion) {
-      return widget.child;
-    }
-
-    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
-        final t = Curves.easeInOut.transform(_controller.value);
-        final blur = 8 + (t * 8);
-        final spread = 0.5 + (t * 1.5);
-        final glowColor = Color.lerp(
-          tokens.colors.accentAiGlow.withValues(alpha: 0.25),
-          tokens.colors.accentAiGlow.withValues(alpha: 0.65),
-          t,
-        );
-
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: glowColor ?? tokens.colors.accentAiGlow,
-                blurRadius: blur,
-                spreadRadius: spread,
-              ),
-            ],
-          ),
-          child: child,
-        );
-      },
-    );
   }
 }
 
