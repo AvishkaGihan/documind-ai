@@ -18,14 +18,17 @@ from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
 from app.schemas.documents import DocumentListResponse, DocumentPublic
+from app.schemas.qa import AskQuestionRequest, AskQuestionResponse
 from app.services.document_service import (
     DocumentDeletionError,
     DocumentNotFoundError,
+    DocumentNotReadyError,
     DocumentService,
     FileTooLargeError,
     InvalidFileTypeError,
 )
 from app.services.processing.pipeline import process_document_pipeline
+from app.services.rag_service import RagService, RagServiceError
 
 router = APIRouter()
 async_session_dependency = Depends(get_async_session)
@@ -133,5 +136,47 @@ async def delete_document(
             detail=build_error_detail(
                 code="DOCUMENT_DELETION_FAILED",
                 message="Failed to delete document resources.",
+            ),
+        ) from exc
+
+
+@router.post("/{document_id}/ask", response_model=AskQuestionResponse)
+async def ask_document_question(
+    document_id: UUID,
+    payload: AskQuestionRequest,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> AskQuestionResponse:
+    service = DocumentService(session)
+
+    try:
+        return await service.ask_question_for_document(
+            user_id=current_user.id,
+            document_id=document_id,
+            question=payload.question,
+            rag_service=RagService(),
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+    except DocumentNotReadyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_READY",
+                message="Document is still processing. Try again when status is ready.",
+            ),
+        ) from exc
+    except RagServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=build_error_detail(
+                code="ANSWER_GENERATION_FAILED",
+                message="Unable to generate an answer at the moment.",
             ),
         ) from exc

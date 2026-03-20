@@ -1,13 +1,28 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import anyio
 import chromadb
 
 from app.config import get_settings
-from app.services.processing.chunker import Chunk
+
+if TYPE_CHECKING:
+    from app.services.processing.chunker import Chunk
+else:
+    Chunk = Any
+
+DEFAULT_SIMILARITY_THRESHOLD = 0.75
+
+
+@dataclass(frozen=True)
+class RetrievedChunk:
+    page_number: int
+    chunk_text: str
+    distance: float
 
 
 class VectorServiceError(Exception):
@@ -64,6 +79,26 @@ class VectorService:
         except Exception as exc:  # pragma: no cover - defensive conversion boundary
             raise VectorServiceError(f"Failed to delete ChromaDB collection: {exc}") from exc
 
+    async def query_chunks(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+        query_embedding: Sequence[float],
+        top_k: int = 5,
+    ) -> list[RetrievedChunk]:
+        collection_name = self._collection_name(user_id=user_id, document_id=document_id)
+
+        try:
+            return await anyio.to_thread.run_sync(
+                self._query_chunks_sync,
+                collection_name,
+                list(query_embedding),
+                top_k,
+            )
+        except Exception as exc:  # pragma: no cover - defensive conversion boundary
+            raise VectorServiceError(f"Failed to query ChromaDB collection: {exc}") from exc
+
     @staticmethod
     def _collection_name(*, user_id: UUID, document_id: UUID) -> str:
         return f"user_{user_id}_doc_{document_id}"
@@ -85,13 +120,58 @@ class VectorService:
         documents: list[str],
         metadatas: list[dict[str, int | str]],
     ) -> None:
-        collection = self._get_client().get_or_create_collection(name=collection_name)
+        collection = self._get_client().get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
         collection.upsert(
             ids=ids,
             embeddings=embeddings,
             documents=documents,
             metadatas=metadatas,
         )
+
+    def _query_chunks_sync(
+        self,
+        collection_name: str,
+        query_embedding: list[float],
+        top_k: int,
+    ) -> list[RetrievedChunk]:
+        collection = self._get_client().get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        payload = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+
+        documents = payload.get("documents") or [[]]
+        metadatas = payload.get("metadatas") or [[]]
+        distances = payload.get("distances") or [[]]
+
+        docs_row = documents[0] if documents else []
+        metadata_row = metadatas[0] if metadatas else []
+        distances_row = distances[0] if distances else []
+
+        retrieved: list[RetrievedChunk] = []
+        for index, document in enumerate(docs_row):
+            metadata = metadata_row[index] if index < len(metadata_row) else {}
+            distance = distances_row[index] if index < len(distances_row) else 1.0
+            page_number = int(metadata.get("page_number", 0)) if metadata else 0
+            if page_number <= 0:
+                continue
+            chunk_text = str(metadata.get("chunk_text") or document or "")
+            retrieved.append(
+                RetrievedChunk(
+                    page_number=page_number,
+                    chunk_text=chunk_text,
+                    distance=float(distance),
+                )
+            )
+
+        return retrieved
 
     def _delete_collection_sync(self, collection_name: str) -> None:
         client = self._get_client()

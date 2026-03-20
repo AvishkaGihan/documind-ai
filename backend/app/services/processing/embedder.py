@@ -29,10 +29,14 @@ class Embedder:
         if not chunks:
             return []
 
-        texts = [chunk.text for chunk in chunks]
+        return await self.embed_texts([chunk.text for chunk in chunks])
+
+    async def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
+        if not texts:
+            return []
 
         try:
-            encoded = await anyio.to_thread.run_sync(self._encode_sync, texts)
+            encoded = await anyio.to_thread.run_sync(self._encode_sync, list(texts))
         except Exception as exc:  # pragma: no cover - defensive conversion boundary
             raise EmbeddingError("Failed to generate embeddings") from exc
 
