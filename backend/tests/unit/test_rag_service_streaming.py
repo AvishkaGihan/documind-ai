@@ -34,7 +34,14 @@ class StubStreamingLlmService:
         self.tokens = tokens or []
         self.fail = fail
 
-    async def stream_answer(self, *, question: str, context_chunks, system_prompt: str):
+    async def stream_answer(
+        self,
+        *,
+        question: str,
+        context_chunks,
+        system_prompt: str,
+        conversation_history=None,
+    ):
         if self.fail:
             raise LlmServiceError("groq unavailable")
 

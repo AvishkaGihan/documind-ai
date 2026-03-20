@@ -75,6 +75,23 @@ async def create_conversation(
     return conversation
 
 
+async def get_conversation_for_scope(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+    conversation_id: UUID,
+) -> Conversation | None:
+    result = await session.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+            Conversation.document_id == document_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def touch_conversation(
     session: AsyncSession,
     *,

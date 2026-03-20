@@ -48,12 +48,20 @@ class StubLlmService:
         self.answer = answer
         self.calls: list[dict[str, object]] = []
 
-    async def generate_answer(self, *, question: str, context_chunks, system_prompt: str) -> str:
+    async def generate_answer(
+        self,
+        *,
+        question: str,
+        context_chunks,
+        system_prompt: str,
+        conversation_history=None,
+    ) -> str:
         self.calls.append(
             {
                 "question": question,
                 "context_chunks": context_chunks,
                 "system_prompt": system_prompt,
+                "conversation_history": conversation_history,
             }
         )
         return self.answer

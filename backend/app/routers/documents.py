@@ -18,13 +18,16 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.sse import format_sse_event
 from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
+from app.schemas.conversations import CreateConversationResponse
 from app.schemas.documents import DocumentListResponse, DocumentPublic
+from app.schemas.messages import MessageListResponse, MessagePublic
 from app.schemas.qa import AskQuestionRequest, AskQuestionResponse
-from app.services.conversation_service import ConversationService
+from app.services.conversation_service import ConversationNotFoundError, ConversationService
 from app.services.document_service import (
     DocumentDeletionError,
     DocumentNotFoundError,
@@ -38,6 +41,7 @@ from app.services.rag_service import RagService, RagServiceError
 
 router = APIRouter()
 async_session_dependency = Depends(get_async_session)
+settings = get_settings()
 
 
 @router.post("/upload", response_model=DocumentPublic, status_code=status.HTTP_201_CREATED)
@@ -155,18 +159,22 @@ async def ask_document_question(
     session: AsyncSession = async_session_dependency,
 ) -> AskQuestionResponse | StreamingResponse:
     service = DocumentService(session)
+    conversation_service = ConversationService(session)
+    rag_service = RagService()
     is_streaming_request = "text/event-stream" in request.headers.get("accept", "").lower()
 
     try:
+        await service.ensure_document_ready_for_question(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        prompt_history = await conversation_service.get_prompt_history(
+            user_id=current_user.id,
+            document_id=document_id,
+            max_messages=settings.rag_max_history_messages,
+        )
+
         if is_streaming_request:
-            await service.ensure_document_ready_for_question(
-                user_id=current_user.id,
-                document_id=document_id,
-            )
-
-            rag_service = RagService()
-            conversation_service = ConversationService(session)
-
             async def _stream_events() -> AsyncIterator[str]:
                 answer_parts: list[str] = []
                 citations: list[dict[str, object]] = []
@@ -177,6 +185,7 @@ async def ask_document_question(
                     user_id=current_user.id,
                     document_id=document_id,
                     question=payload.question,
+                    conversation_history=prompt_history,
                 ):
                     if event_name == "token":
                         token = str(event_payload.get("content", ""))
@@ -197,7 +206,7 @@ async def ask_document_question(
                         return
 
                 if not saw_error:
-                    assistant_message_id = await conversation_service.persist_stream_completion(
+                    assistant_message_id = await conversation_service.persist_qa_exchange(
                         user_id=current_user.id,
                         document_id=document_id,
                         question=payload.question,
@@ -216,12 +225,21 @@ async def ask_document_question(
                 },
             )
 
-        return await service.ask_question_for_document(
+        response = await rag_service.ask_question(
             user_id=current_user.id,
             document_id=document_id,
             question=payload.question,
-            rag_service=RagService(),
+            conversation_history=prompt_history,
         )
+        citations = [citation.model_dump() for citation in response.citations]
+        await conversation_service.persist_qa_exchange(
+            user_id=current_user.id,
+            document_id=document_id,
+            question=payload.question,
+            answer_text=response.answer,
+            citations=citations,
+        )
+        return response
     except DocumentNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -246,3 +264,85 @@ async def ask_document_question(
                 message="Unable to generate an answer at the moment.",
             ),
         ) from exc
+
+
+@router.post(
+    "/{document_id}/conversations/new",
+    response_model=CreateConversationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_new_conversation(
+    document_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> CreateConversationResponse:
+    document_service = DocumentService(session)
+    conversation_service = ConversationService(session)
+
+    try:
+        await document_service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        conversation_id = await conversation_service.create_new_conversation(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        return CreateConversationResponse(conversation_id=conversation_id)
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+
+
+@router.get(
+    "/{document_id}/conversations/{conversation_id}/messages",
+    response_model=MessageListResponse,
+)
+async def list_conversation_messages(
+    document_id: UUID,
+    conversation_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> MessageListResponse:
+    document_service = DocumentService(session)
+    conversation_service = ConversationService(session)
+
+    try:
+        await document_service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        messages = await conversation_service.list_messages_for_conversation(
+            user_id=current_user.id,
+            document_id=document_id,
+            conversation_id=conversation_id,
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+    except ConversationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="CONVERSATION_NOT_FOUND",
+                message="Conversation not found.",
+            ),
+        ) from exc
+
+    items = [MessagePublic.model_validate(message) for message in messages]
+    return MessageListResponse(
+        items=items,
+        total=len(items),
+        page=1,
+        page_size=len(items),
+    )

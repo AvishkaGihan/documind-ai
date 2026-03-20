@@ -4,6 +4,7 @@ import re
 from collections.abc import AsyncIterator
 from uuid import UUID
 
+from app.models.message import Message
 from app.schemas.qa import AskQuestionResponse, CitationPublic
 from app.services.llm_service import LlmService, LlmServiceError
 from app.services.processing.embedder import Embedder, EmbeddingError
@@ -54,6 +55,7 @@ class RagService:
         document_id: UUID,
         question: str,
         top_k: int = DEFAULT_TOP_K,
+        conversation_history: list[Message] | None = None,
     ) -> AskQuestionResponse:
         try:
             question_embeddings = await self._embedder.embed_texts([question])
@@ -79,6 +81,7 @@ class RagService:
                 question=question,
                 context_chunks=relevant_chunks,
                 system_prompt=SYSTEM_PROMPT,
+                conversation_history=conversation_history,
             )
             citations = self._build_citations(relevant_chunks)
             return AskQuestionResponse(answer=answer, citations=citations)
@@ -92,6 +95,7 @@ class RagService:
         document_id: UUID,
         question: str,
         top_k: int = DEFAULT_TOP_K,
+        conversation_history: list[Message] | None = None,
     ) -> AsyncIterator[tuple[str, dict[str, object]]]:
         try:
             question_embeddings = await self._embedder.embed_texts([question])
@@ -125,6 +129,7 @@ class RagService:
                 question=question,
                 context_chunks=relevant_chunks,
                 system_prompt=SYSTEM_PROMPT,
+                conversation_history=conversation_history,
             ):
                 yield "token", {"content": token}
                 rolling_buffer = f"{rolling_buffer}{token}"[-200:]
