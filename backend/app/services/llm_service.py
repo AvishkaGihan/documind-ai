@@ -5,7 +5,7 @@ from typing import Any
 
 import anyio
 import structlog
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 
 from app.config import get_settings
@@ -41,19 +41,18 @@ class LlmService:
         question: str,
         context_chunks: Sequence[RetrievedChunk],
         system_prompt: str,
+        conversation_history: Sequence[Any] | None = None,
     ) -> str:
         if not self._api_key:
             raise LlmServiceError("GROQ_API_KEY is required for answer generation")
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(
-                content=self._build_user_prompt(
-                    question=question,
-                    context_chunks=context_chunks,
-                )
-            ),
-        ]
+        messages = self._build_messages(
+            question=question,
+            context_chunks=context_chunks,
+            system_prompt=system_prompt,
+            conversation_history=conversation_history,
+            max_history_messages=get_settings().rag_max_history_messages,
+        )
 
         attempts = self._max_retries + 1
         last_error: Exception | None = None
@@ -81,19 +80,18 @@ class LlmService:
         question: str,
         context_chunks: Sequence[RetrievedChunk],
         system_prompt: str,
+        conversation_history: Sequence[Any] | None = None,
     ) -> AsyncIterator[str]:
         if not self._api_key:
             raise LlmServiceError("GROQ_API_KEY is required for answer generation")
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(
-                content=self._build_user_prompt(
-                    question=question,
-                    context_chunks=context_chunks,
-                )
-            ),
-        ]
+        messages = self._build_messages(
+            question=question,
+            context_chunks=context_chunks,
+            system_prompt=system_prompt,
+            conversation_history=conversation_history,
+            max_history_messages=get_settings().rag_max_history_messages,
+        )
 
         attempts = self._max_retries + 1
         last_error: Exception | None = None
@@ -163,3 +161,49 @@ class LlmService:
         ]
         context_text = "\n\n".join(context_blocks)
         return f"Context:\n{context_text}\n\nQuestion:\n{question}"
+
+    def _build_messages(
+        self,
+        *,
+        question: str,
+        context_chunks: Sequence[RetrievedChunk],
+        system_prompt: str,
+        conversation_history: Sequence[Any] | None,
+        max_history_messages: int,
+    ) -> list[BaseMessage]:
+        history_messages = self._coerce_history_messages(conversation_history)
+        bounded_history = history_messages[-max(0, max_history_messages) :]
+
+        return [
+            SystemMessage(content=system_prompt),
+            *bounded_history,
+            HumanMessage(
+                content=self._build_user_prompt(
+                    question=question,
+                    context_chunks=context_chunks,
+                )
+            ),
+        ]
+
+    @staticmethod
+    def _coerce_history_messages(conversation_history: Sequence[Any] | None) -> list[BaseMessage]:
+        if not conversation_history:
+            return []
+
+        messages: list[BaseMessage] = []
+        for item in conversation_history:
+            role = getattr(item, "role", None)
+            content = getattr(item, "content", None)
+            if role is None and isinstance(item, dict):
+                role = item.get("role")
+                content = item.get("content")
+
+            role_text = str(role or "").strip().lower()
+            content_text = str(content or "").strip()
+            if not content_text:
+                continue
+            if role_text == "user":
+                messages.append(HumanMessage(content=content_text))
+            elif role_text == "assistant":
+                messages.append(AIMessage(content=content_text))
+        return messages

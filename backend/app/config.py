@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     groq_model_name: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL_NAME")
     groq_timeout_seconds: int = Field(default=20, alias="GROQ_TIMEOUT_SECONDS")
     groq_max_retries: int = Field(default=2, alias="GROQ_MAX_RETRIES")
+    rag_max_history_messages: int = Field(default=12, alias="RAG_MAX_HISTORY_MESSAGES")
     chroma_host: str = Field(default="localhost", alias="CHROMA_HOST")
     chroma_port: int = Field(default=8001, alias="CHROMA_PORT")
 

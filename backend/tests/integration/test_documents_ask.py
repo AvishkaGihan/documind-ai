@@ -17,12 +17,14 @@ class FakeRagService:
         user_id: UUID,
         document_id: UUID,
         question: str,
+        conversation_history,
     ) -> AskQuestionResponse:
         self.calls.append(
             {
                 "user_id": user_id,
                 "document_id": document_id,
                 "question": question,
+                "conversation_history": conversation_history,
             }
         )
         return AskQuestionResponse(

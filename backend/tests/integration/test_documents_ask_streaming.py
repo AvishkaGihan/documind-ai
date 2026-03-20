@@ -81,8 +81,16 @@ def test_streaming_ask_returns_token_and_done_and_persists_messages(
     from app.routers import documents as documents_router
 
     class FakeRagService:
-        async def stream_answer_events(self, *, user_id, document_id, question):
+        async def stream_answer_events(
+            self,
+            *,
+            user_id,
+            document_id,
+            question,
+            conversation_history,
+        ):
             del user_id, document_id, question
+            del conversation_history
             yield "token", {"content": "According to page "}
             yield "token", {"content": "4, this is streamed."}
             yield "citation", {"page": 4, "text": "Key retained point"}
@@ -139,8 +147,16 @@ def test_streaming_ask_emits_error_event_when_llm_unavailable(
     from app.routers import documents as documents_router
 
     class FakeRagService:
-        async def stream_answer_events(self, *, user_id, document_id, question):
+        async def stream_answer_events(
+            self,
+            *,
+            user_id,
+            document_id,
+            question,
+            conversation_history,
+        ):
             del user_id, document_id, question
+            del conversation_history
             yield "error", {
                 "code": "LLM_UNAVAILABLE",
                 "message": "Unable to generate an answer at the moment.",
