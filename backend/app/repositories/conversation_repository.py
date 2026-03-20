@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -42,3 +43,44 @@ async def delete_conversations_for_document(
         delete(Conversation).where(Conversation.document_id == document_id)
     )
     return int(result.rowcount or 0)
+
+
+async def get_latest_conversation_for_document(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+) -> Conversation | None:
+    result = await session.execute(
+        select(Conversation)
+        .where(
+            Conversation.user_id == user_id,
+            Conversation.document_id == document_id,
+        )
+        .order_by(Conversation.updated_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_conversation(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+) -> Conversation:
+    conversation = Conversation(user_id=user_id, document_id=document_id)
+    session.add(conversation)
+    await session.flush()
+    return conversation
+
+
+async def touch_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: UUID,
+) -> None:
+    conversation = await session.get(Conversation, conversation_id)
+    if conversation is not None:
+        conversation.updated_at = datetime.now(UTC)
+        await session.flush()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from collections.abc import AsyncIterator
 from uuid import UUID
 
 from app.schemas.qa import AskQuestionResponse, CitationPublic
@@ -83,6 +85,66 @@ class RagService:
         except (EmbeddingError, VectorServiceError, LlmServiceError) as exc:
             raise RagServiceError("Failed to generate RAG answer") from exc
 
+    async def stream_answer_events(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+        question: str,
+        top_k: int = DEFAULT_TOP_K,
+    ) -> AsyncIterator[tuple[str, dict[str, object]]]:
+        try:
+            question_embeddings = await self._embedder.embed_texts([question])
+            if not question_embeddings:
+                raise RagServiceError("Question embedding generation returned no vectors")
+
+            retrieved_chunks = await self._vector_service.query_chunks(
+                user_id=user_id,
+                document_id=document_id,
+                query_embedding=question_embeddings[0],
+                top_k=top_k,
+            )
+
+            relevant_chunks = [
+                chunk
+                for chunk in retrieved_chunks
+                if self._distance_to_similarity(chunk.distance) >= self._similarity_threshold
+            ]
+            if not relevant_chunks:
+                yield "token", {"content": FALLBACK_NO_RELEVANT_INFO}
+                return
+
+            citation_by_page = {
+                citation.page_number: citation.text
+                for citation in self._build_citations(relevant_chunks)
+            }
+
+            emitted_pages: set[int] = set()
+            rolling_buffer = ""
+            async for token in self._llm_service.stream_answer(
+                question=question,
+                context_chunks=relevant_chunks,
+                system_prompt=SYSTEM_PROMPT,
+            ):
+                yield "token", {"content": token}
+                rolling_buffer = f"{rolling_buffer}{token}"[-200:]
+
+                for page in self._extract_pages(rolling_buffer):
+                    if page in emitted_pages:
+                        continue
+                    excerpt = citation_by_page.get(page)
+                    if excerpt is None:
+                        continue
+                    emitted_pages.add(page)
+                    yield "citation", {"page": page, "text": excerpt}
+        except LlmServiceError:
+            yield "error", {
+                "code": "LLM_UNAVAILABLE",
+                "message": "Unable to generate an answer at the moment.",
+            }
+        except (EmbeddingError, VectorServiceError) as exc:
+            raise RagServiceError("Failed to generate RAG answer") from exc
+
     @staticmethod
     def _distance_to_similarity(distance: float) -> float:
         # Chroma cosine distance is converted into similarity for thresholding.
@@ -100,3 +162,11 @@ class RagService:
             citations.append(CitationPublic(page_number=chunk.page_number, text=excerpt))
             seen.add(key)
         return citations
+
+    @staticmethod
+    def _extract_pages(text: str) -> list[int]:
+        matches = re.finditer(r"page\s+(\d+)", text, flags=re.IGNORECASE)
+        pages: list[int] = []
+        for match in matches:
+            pages.append(int(match.group(1)))
+        return pages

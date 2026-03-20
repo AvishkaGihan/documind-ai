@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 import anyio
@@ -75,6 +75,57 @@ class LlmService:
 
         raise LlmServiceError("Failed to generate answer from Groq") from last_error
 
+    async def stream_answer(
+        self,
+        *,
+        question: str,
+        context_chunks: Sequence[RetrievedChunk],
+        system_prompt: str,
+    ) -> AsyncIterator[str]:
+        if not self._api_key:
+            raise LlmServiceError("GROQ_API_KEY is required for answer generation")
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=self._build_user_prompt(
+                    question=question,
+                    context_chunks=context_chunks,
+                )
+            ),
+        ]
+
+        attempts = self._max_retries + 1
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            emitted_any_token = False
+            try:
+                with anyio.fail_after(self._timeout_seconds):
+                    async for chunk in self._get_client().astream(messages):
+                        token = self._chunk_to_text(chunk)
+                        if not token:
+                            continue
+                        emitted_any_token = True
+                        yield token
+                        # Ensure a regular cancellation point for disconnected clients.
+                        await anyio.sleep(0)
+                return
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "groq_stream_failed",
+                    model_name=self._model_name,
+                    attempt=attempt,
+                    max_attempts=attempts,
+                    emitted_any_token=emitted_any_token,
+                    error=str(exc),
+                )
+                if emitted_any_token or attempt >= attempts:
+                    break
+                await anyio.sleep(0.2)
+
+        raise LlmServiceError("Failed to stream answer from Groq") from last_error
+
     def _invoke_sync(self, messages: list[Any]) -> str:
         response = self._get_client().invoke(messages)
         content = getattr(response, "content", "")
@@ -94,6 +145,16 @@ class LlmService:
                 timeout=self._timeout_seconds,
             )
         return self._client
+
+    @staticmethod
+    def _chunk_to_text(chunk: Any) -> str:
+        content = getattr(chunk, "content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = [item.get("text", "") for item in content if isinstance(item, dict)]
+            return "".join(parts)
+        return str(content or "")
 
     @staticmethod
     def _build_user_prompt(*, question: str, context_chunks: Sequence[RetrievedChunk]) -> str:

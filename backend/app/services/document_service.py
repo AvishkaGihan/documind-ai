@@ -222,15 +222,7 @@ class DocumentService:
         question: str,
         rag_service: RagService | None = None,
     ) -> AskQuestionResponse:
-        document = await get_document_for_user(
-            self._session,
-            document_id=document_id,
-            user_id=user_id,
-        )
-        if document is None:
-            raise DocumentNotFoundError
-        if document.status != DocumentStatus.READY:
-            raise DocumentNotReadyError
+        await self.ensure_document_ready_for_question(user_id=user_id, document_id=document_id)
 
         if rag_service is None:
             from app.services.rag_service import RagService
@@ -243,3 +235,19 @@ class DocumentService:
             document_id=document_id,
             question=question,
         )
+
+    async def ensure_document_ready_for_question(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+    ) -> None:
+        document = await get_document_for_user(
+            self._session,
+            document_id=document_id,
+            user_id=user_id,
+        )
+        if document is None:
+            raise DocumentNotFoundError
+        if document.status != DocumentStatus.READY:
+            raise DocumentNotReadyError
