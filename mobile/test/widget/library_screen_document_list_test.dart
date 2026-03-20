@@ -1,5 +1,11 @@
+import 'dart:async';
+
+import 'package:documind_ai/core/networking/connectivity_provider.dart';
+import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:dio/dio.dart';
 import 'package:documind_ai/core/theme/app_theme.dart';
+import 'package:documind_ai/features/chat/models/chat_models.dart';
+import 'package:documind_ai/features/auth/data/token_storage.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
 import 'package:documind_ai/features/library/screens/library_screen.dart';
@@ -91,7 +97,14 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [documentsApiProvider.overrideWithValue(api)],
+        overrides: [
+          documentsApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
         child: MaterialApp.router(
           theme: AppTheme.darkTheme,
           routerConfig: router,
@@ -387,7 +400,14 @@ void _setScreenSize(WidgetTester tester, Size size) {
 
 Widget _buildApp(_FakeDocumentsApi api) {
   return ProviderScope(
-    overrides: [documentsApiProvider.overrideWithValue(api)],
+    overrides: [
+      documentsApiProvider.overrideWithValue(api),
+      connectivityServiceProvider.overrideWithValue(
+        _FakeConnectivityService(initialOnline: true),
+      ),
+      localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+      tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+    ],
     child: MaterialApp(theme: AppTheme.darkTheme, home: const LibraryScreen()),
   );
 }
@@ -437,4 +457,104 @@ class _FakeDocumentsApi extends DocumentsApi {
   Future<void> deleteDocument(String documentId) async {
     await deleteHandler(documentId);
   }
+}
+
+class _FakeConnectivityService implements ConnectivityService {
+  _FakeConnectivityService({required bool initialOnline})
+    : _isOnline = initialOnline;
+
+  final bool _isOnline;
+  final _controller = StreamController<bool>.broadcast();
+
+  @override
+  bool get isOnline => _isOnline;
+
+  @override
+  Stream<bool> get onlineChanges => _controller.stream;
+}
+
+class _FakeLocalCacheStore implements LocalCacheStore {
+  @override
+  Future<void> cacheChatMessages({
+    required String userNamespace,
+    required String documentId,
+    required List<ChatMessage> messages,
+  }) async {}
+
+  @override
+  Future<void> cacheDocumentList({
+    required String userNamespace,
+    required DocumentListResponse response,
+  }) async {}
+
+  @override
+  Future<void> enqueueQuestion({
+    required String userNamespace,
+    required QueuedQuestionItem item,
+  }) async {}
+
+  @override
+  Future<void> enqueueUpload({
+    required String userNamespace,
+    required QueuedUploadItem item,
+  }) async {}
+
+  @override
+  Future<List<ChatMessage>> readChatMessages({
+    required String userNamespace,
+    required String documentId,
+  }) async {
+    return const <ChatMessage>[];
+  }
+
+  @override
+  Future<DocumentListResponse?> readDocumentList({
+    required String userNamespace,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<List<QueuedQuestionItem>> readQueuedQuestions({
+    required String userNamespace,
+  }) async {
+    return const <QueuedQuestionItem>[];
+  }
+
+  @override
+  Future<List<QueuedUploadItem>> readQueuedUploads({
+    required String userNamespace,
+  }) async {
+    return const <QueuedUploadItem>[];
+  }
+
+  @override
+  Future<void> removeQueuedQuestion({
+    required String userNamespace,
+    required String queueId,
+  }) async {}
+
+  @override
+  Future<void> removeQueuedUpload({
+    required String userNamespace,
+    required String queueId,
+  }) async {}
+}
+
+class _FakeTokenStorage implements TokenStorage {
+  @override
+  Future<void> clear() async {}
+
+  @override
+  Future<StoredAuthSession?> readSession() async {
+    return null;
+  }
+
+  @override
+  Future<void> writeSession({
+    required String accessToken,
+    required String refreshToken,
+    String? userId,
+    String? email,
+  }) async {}
 }

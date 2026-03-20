@@ -78,6 +78,23 @@ class DocumentUploadCard extends StatelessWidget {
     final tokens = theme.extension<DocuMindTokens>()!;
 
     switch (state.phase) {
+      case UploadCardPhase.queued:
+        return Row(
+          children: [
+            Icon(Icons.schedule, color: tokens.colors.accentPrimary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                'Queued - will upload when online',
+                key: const Key('upload-queued-label'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.colors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
       case UploadCardPhase.uploading:
         final progress = state.progress ?? 0;
         return Column(
@@ -218,6 +235,8 @@ class DocumentUploadCard extends StatelessWidget {
 
   String _semanticsLabel(String title) {
     switch (state.phase) {
+      case UploadCardPhase.queued:
+        return '$title queued for upload';
       case UploadCardPhase.uploading:
         final progress = state.progress ?? 0;
         return '$title uploading ${progress.toStringAsFixed(0)} percent';

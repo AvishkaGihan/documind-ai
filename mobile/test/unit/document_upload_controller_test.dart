@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:documind_ai/core/networking/connectivity_provider.dart';
+import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:dio/dio.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
 import 'package:documind_ai/features/library/data/file_picker_service.dart';
+import 'package:documind_ai/features/chat/models/chat_models.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
+import 'package:documind_ai/features/library/providers/document_list_provider.dart';
 import 'package:documind_ai/features/library/providers/document_upload_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +53,11 @@ void main() {
           _FakePdfFilePickerService(selectedFile),
         ),
         documentsApiProvider.overrideWithValue(fakeApi),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        documentListProvider.overrideWith(_NoopDocumentListNotifier.new),
       ],
     );
     addTearDown(container.dispose);
@@ -111,6 +121,11 @@ void main() {
           _FakePdfFilePickerService(selectedFile),
         ),
         documentsApiProvider.overrideWithValue(fakeApi),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        documentListProvider.overrideWith(_NoopDocumentListNotifier.new),
       ],
     );
     addTearDown(container.dispose);
@@ -173,6 +188,11 @@ void main() {
           _FakePdfFilePickerService(selectedFile),
         ),
         documentsApiProvider.overrideWithValue(fakeApi),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        documentListProvider.overrideWith(_NoopDocumentListNotifier.new),
       ],
     );
     addTearDown(container.dispose);
@@ -234,6 +254,11 @@ void main() {
             _FakePdfFilePickerService(selectedFile),
           ),
           documentsApiProvider.overrideWithValue(fakeApi),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          documentListProvider.overrideWith(_NoopDocumentListNotifier.new),
         ],
       );
       addTearDown(container.dispose);
@@ -246,6 +271,66 @@ void main() {
       expect(fakeApi.getCallCount, 1);
     },
   );
+
+  test('offline upload is queued and flushes when back online', () async {
+    final selectedFile = SelectedPdfFile(
+      name: 'offline.pdf',
+      sizeInBytes: 1024,
+      bytes: Uint8List.fromList(<int>[4, 5, 6]),
+    );
+    final connectivity = _FakeConnectivityService(initialOnline: false);
+    final cache = _FakeLocalCacheStore();
+    final fakeApi = _FakeDocumentsApi(
+      uploadHandler: ({required file, required onProgress}) async {
+        onProgress(100, 100);
+        return UploadedDocument(
+          id: 'doc-offline',
+          title: 'offline',
+          fileSize: 1024,
+          pageCount: 2,
+          status: 'processing',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 19),
+        );
+      },
+      getHandler: (documentId) async {
+        return UploadedDocument(
+          id: documentId,
+          title: 'offline',
+          fileSize: 1024,
+          pageCount: 2,
+          status: 'ready',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 19),
+        );
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        connectivityServiceProvider.overrideWithValue(connectivity),
+        localCacheStoreProvider.overrideWithValue(cache),
+        documentsApiProvider.overrideWithValue(fakeApi),
+        documentListProvider.overrideWith(_NoopDocumentListNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(documentUploadControllerProvider.notifier)
+        .uploadSelectedFile(selectedFile);
+
+    final queuedState = container.read(documentUploadControllerProvider);
+    expect(queuedState.phase, UploadCardPhase.queued);
+    expect(cache.queuedUploads, hasLength(1));
+    expect(fakeApi.uploadCallCount, 0);
+
+    connectivity.emit(true);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    expect(fakeApi.uploadCallCount, 1);
+    expect(cache.queuedUploads, isEmpty);
+  });
 }
 
 typedef _UploadHandler =
@@ -279,6 +364,19 @@ class _FakeDocumentsApi extends DocumentsApi {
     getCallCount += 1;
     return getHandler(documentId);
   }
+
+  @override
+  Future<DocumentListResponse> getDocuments({
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    return const DocumentListResponse(
+      items: <UploadedDocument>[],
+      total: 0,
+      page: 1,
+      pageSize: 100,
+    );
+  }
 }
 
 class _FakePdfFilePickerService implements PdfFilePickerService {
@@ -288,4 +386,112 @@ class _FakePdfFilePickerService implements PdfFilePickerService {
 
   @override
   Future<SelectedPdfFile?> pickPdf() async => file;
+}
+
+class _FakeConnectivityService implements ConnectivityService {
+  _FakeConnectivityService({required bool initialOnline})
+    : _isOnline = initialOnline;
+
+  final _controller = StreamController<bool>.broadcast();
+  bool _isOnline;
+
+  @override
+  bool get isOnline => _isOnline;
+
+  @override
+  Stream<bool> get onlineChanges => _controller.stream;
+
+  void emit(bool isOnline) {
+    _isOnline = isOnline;
+    _controller.add(isOnline);
+  }
+}
+
+class _FakeLocalCacheStore implements LocalCacheStore {
+  final List<QueuedUploadItem> queuedUploads = <QueuedUploadItem>[];
+
+  @override
+  Future<void> cacheChatMessages({
+    required String userNamespace,
+    required String documentId,
+    required List<ChatMessage> messages,
+  }) async {}
+
+  @override
+  Future<void> cacheDocumentList({
+    required String userNamespace,
+    required DocumentListResponse response,
+  }) async {}
+
+  @override
+  Future<void> enqueueQuestion({
+    required String userNamespace,
+    required QueuedQuestionItem item,
+  }) async {}
+
+  @override
+  Future<void> enqueueUpload({
+    required String userNamespace,
+    required QueuedUploadItem item,
+  }) async {
+    queuedUploads.add(item);
+  }
+
+  @override
+  Future<List<ChatMessage>> readChatMessages({
+    required String userNamespace,
+    required String documentId,
+  }) async {
+    return const <ChatMessage>[];
+  }
+
+  @override
+  Future<DocumentListResponse?> readDocumentList({
+    required String userNamespace,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<List<QueuedQuestionItem>> readQueuedQuestions({
+    required String userNamespace,
+  }) async {
+    return const <QueuedQuestionItem>[];
+  }
+
+  @override
+  Future<List<QueuedUploadItem>> readQueuedUploads({
+    required String userNamespace,
+  }) async {
+    return List<QueuedUploadItem>.from(queuedUploads);
+  }
+
+  @override
+  Future<void> removeQueuedQuestion({
+    required String userNamespace,
+    required String queueId,
+  }) async {}
+
+  @override
+  Future<void> removeQueuedUpload({
+    required String userNamespace,
+    required String queueId,
+  }) async {
+    queuedUploads.removeWhere((item) => item.id == queueId);
+  }
+}
+
+class _NoopDocumentListNotifier extends DocumentListNotifier {
+  @override
+  Future<DocumentListResponse> build() async {
+    return const DocumentListResponse(
+      items: <UploadedDocument>[],
+      total: 0,
+      page: 1,
+      pageSize: 100,
+    );
+  }
+
+  @override
+  Future<void> refresh() async {}
 }
