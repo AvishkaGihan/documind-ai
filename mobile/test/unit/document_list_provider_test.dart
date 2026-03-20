@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:documind_ai/core/networking/connectivity_provider.dart';
+import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
+import 'package:documind_ai/features/chat/models/chat_models.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
 import 'package:documind_ai/features/library/providers/document_list_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,7 +34,13 @@ void main() {
     );
 
     final container = ProviderContainer(
-      overrides: [documentsApiProvider.overrideWithValue(fakeApi)],
+      overrides: [
+        documentsApiProvider.overrideWithValue(fakeApi),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -45,6 +54,49 @@ void main() {
     final second = await container.read(documentListProvider.future);
     expect(callCount, 2);
     expect(second.items.first.id, 'doc-2');
+  });
+
+  test('returns cached list when api fails with NETWORK_ERROR', () async {
+    final cached = DocumentListResponse(
+      items: [
+        UploadedDocument(
+          id: 'cached-doc',
+          title: 'Cached Doc',
+          fileSize: 777,
+          pageCount: 2,
+          status: 'ready',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 19),
+        ),
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+    );
+
+    final cacheStore = _FakeLocalCacheStore()..cachedList = cached;
+    final fakeApi = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        throw const LibraryApiError(
+          code: 'NETWORK_ERROR',
+          message: 'Unable to reach server',
+        );
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        documentsApiProvider.overrideWithValue(fakeApi),
+        localCacheStoreProvider.overrideWithValue(cacheStore),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final response = await container.read(documentListProvider.future);
+    expect(response.items.single.id, 'cached-doc');
   });
 }
 
@@ -66,4 +118,88 @@ class _FakeDocumentsApi extends DocumentsApi {
   }) async {
     return getDocumentsHandler(page: page, pageSize: pageSize);
   }
+}
+
+class _FakeLocalCacheStore implements LocalCacheStore {
+  DocumentListResponse? cachedList;
+
+  @override
+  Future<void> cacheChatMessages({
+    required String userNamespace,
+    required String documentId,
+    required List<ChatMessage> messages,
+  }) async {}
+
+  @override
+  Future<void> cacheDocumentList({
+    required String userNamespace,
+    required DocumentListResponse response,
+  }) async {
+    cachedList = response;
+  }
+
+  @override
+  Future<void> enqueueQuestion({
+    required String userNamespace,
+    required QueuedQuestionItem item,
+  }) async {}
+
+  @override
+  Future<void> enqueueUpload({
+    required String userNamespace,
+    required QueuedUploadItem item,
+  }) async {}
+
+  @override
+  Future<List<ChatMessage>> readChatMessages({
+    required String userNamespace,
+    required String documentId,
+  }) async {
+    return const <ChatMessage>[];
+  }
+
+  @override
+  Future<DocumentListResponse?> readDocumentList({
+    required String userNamespace,
+  }) async {
+    return cachedList;
+  }
+
+  @override
+  Future<List<QueuedQuestionItem>> readQueuedQuestions({
+    required String userNamespace,
+  }) async {
+    return const <QueuedQuestionItem>[];
+  }
+
+  @override
+  Future<List<QueuedUploadItem>> readQueuedUploads({
+    required String userNamespace,
+  }) async {
+    return const <QueuedUploadItem>[];
+  }
+
+  @override
+  Future<void> removeQueuedQuestion({
+    required String userNamespace,
+    required String queueId,
+  }) async {}
+
+  @override
+  Future<void> removeQueuedUpload({
+    required String userNamespace,
+    required String queueId,
+  }) async {}
+}
+
+class _FakeConnectivityService implements ConnectivityService {
+  _FakeConnectivityService({required this.initialOnline});
+
+  final bool initialOnline;
+
+  @override
+  bool get isOnline => initialOnline;
+
+  @override
+  Stream<bool> get onlineChanges => const Stream<bool>.empty();
 }

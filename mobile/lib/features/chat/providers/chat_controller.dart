@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:documind_ai/core/networking/connectivity_provider.dart';
+import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:documind_ai/features/chat/data/chat_api.dart';
 import 'package:documind_ai/features/chat/models/chat_models.dart';
 import 'package:flutter/foundation.dart';
@@ -77,12 +80,39 @@ class ChatState {
 }
 
 class ChatController extends Notifier<ChatState> {
+  static const String _offlineQueuedMessage =
+      'Q&A requires an internet connection. Your question will be sent when connectivity restores.';
+  static const Duration _queueRetryBackoff = Duration(seconds: 15);
+
+  bool _isFlushingQueuedQuestions = false;
+  DateTime _nextQueueFlushAt = DateTime.fromMillisecondsSinceEpoch(
+    0,
+    isUtc: true,
+  );
+
   @override
   ChatState build() {
+    final connectivity = ref.read(connectivityServiceProvider);
+    final sub = connectivity.onlineChanges.listen((isOnline) {
+      if (!isOnline) {
+        return;
+      }
+      final currentDocumentId = state.documentId;
+      if (currentDocumentId == null) {
+        return;
+      }
+      unawaited(_flushQueuedQuestions(currentDocumentId));
+    });
+    ref.onDispose(sub.cancel);
+
     return const ChatState();
   }
 
   Future<void> load(String documentId) async {
+    final namespace = await resolveUserCacheNamespace(ref);
+    final cache = ref.read(localCacheStoreProvider);
+    final isOnline = ref.read(connectivityServiceProvider).isOnline;
+
     state = state.copyWith(
       documentId: documentId,
       messages: const <ChatMessage>[],
@@ -96,9 +126,30 @@ class ChatController extends Notifier<ChatState> {
       clearAnnouncement: true,
     );
 
+    if (!isOnline) {
+      final cachedMessages = await cache.readChatMessages(
+        userNamespace: namespace,
+        documentId: documentId,
+      );
+      state = state.copyWith(
+        documentId: documentId,
+        messages: cachedMessages,
+        isLoading: false,
+        isDocumentReady: true,
+        clearErrorMessage: true,
+      );
+      return;
+    }
+
     final api = ref.read(chatApiProvider);
     try {
       final bootstrap = await api.bootstrap(documentId);
+      await cache.cacheChatMessages(
+        userNamespace: namespace,
+        documentId: documentId,
+        messages: bootstrap.messages,
+      );
+
       state = state.copyWith(
         documentId: documentId,
         documentTitle: bootstrap.documentTitle,
@@ -109,12 +160,27 @@ class ChatController extends Notifier<ChatState> {
             ? null
             : 'Document is still processing. Try again when status is ready.',
       );
+      await _flushQueuedQuestions(documentId);
     } on ChatApiError catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.message,
-        isDocumentReady: error.code != 'DOCUMENT_NOT_READY',
-      );
+      if (_isNetworkStyleError(error)) {
+        final cachedMessages = await cache.readChatMessages(
+          userNamespace: namespace,
+          documentId: documentId,
+        );
+        state = state.copyWith(
+          documentId: documentId,
+          messages: cachedMessages,
+          isLoading: false,
+          isDocumentReady: true,
+          clearErrorMessage: true,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: error.message,
+          isDocumentReady: error.code != 'DOCUMENT_NOT_READY',
+        );
+      }
     }
   }
 
@@ -201,14 +267,89 @@ class ChatController extends Notifier<ChatState> {
       return;
     }
 
+    final isOnline = ref.read(connectivityServiceProvider).isOnline;
+    if (!isOnline) {
+      await _queueOfflineQuestion(trimmed);
+      return;
+    }
+
+    await _sendOnlineQuestion(trimmed);
+  }
+
+  Future<void> _queueOfflineQuestion(String question) async {
+    final documentId = state.documentId;
+    if (documentId == null) {
+      return;
+    }
+
+    final cache = ref.read(localCacheStoreProvider);
+    final namespace = await resolveUserCacheNamespace(ref);
+    await cache.enqueueQuestion(
+      userNamespace: namespace,
+      item: QueuedQuestionItem(
+        id: QueueItemId.next(),
+        documentId: documentId,
+        question: question,
+        enqueuedAt: DateTime.now().toUtc(),
+      ),
+    );
+
     final userMessage = ChatMessage(
       id: _localId('user'),
       role: ChatRole.user,
-      content: trimmed,
+      content: question,
+      citations: const <Citation>[],
+      createdAt: DateTime.now().toUtc(),
+    );
+    final systemMessage = ChatMessage(
+      id: _localId('assistant'),
+      role: ChatRole.assistant,
+      content: _offlineQueuedMessage,
+      citations: const <Citation>[],
+      createdAt: DateTime.now().toUtc(),
+      isComplete: true,
+    );
+
+    state = state.copyWith(
+      messages: <ChatMessage>[...state.messages, userMessage, systemMessage],
+      inputDraft: '',
+      clearErrorMessage: true,
+      errorMessage: _offlineQueuedMessage,
+      announcement: _offlineQueuedMessage,
+    );
+    await _persistMessages();
+  }
+
+  Future<void> _sendOnlineQuestion(String question) async {
+    final documentId = state.documentId;
+    if (documentId == null) {
+      return;
+    }
+
+    final userMessage = ChatMessage(
+      id: _localId('user'),
+      role: ChatRole.user,
+      content: question,
       citations: const <Citation>[],
       createdAt: DateTime.now().toUtc(),
     );
 
+    state = state.copyWith(
+      messages: <ChatMessage>[...state.messages, userMessage],
+      inputDraft: '',
+      clearErrorMessage: true,
+      clearAnnouncement: true,
+    );
+
+    await _streamAnswer(documentId: documentId, question: question);
+    await _persistMessages();
+  }
+
+  Future<void> _streamAnswer({
+    required String documentId,
+    required String question,
+    String? queueId,
+  }) async {
     final inFlightAssistantId = _localId('assistant');
     final assistantMessage = ChatMessage(
       id: inFlightAssistantId,
@@ -220,10 +361,9 @@ class ChatController extends Notifier<ChatState> {
     );
 
     state = state.copyWith(
-      messages: <ChatMessage>[...state.messages, userMessage, assistantMessage],
+      messages: <ChatMessage>[...state.messages, assistantMessage],
       isStreaming: true,
       inFlightAnswerId: inFlightAssistantId,
-      inputDraft: '',
       clearErrorMessage: true,
       clearAnnouncement: true,
     );
@@ -233,8 +373,8 @@ class ChatController extends Notifier<ChatState> {
 
     try {
       await for (final event in api.streamAsk(
-        documentId: state.documentId!,
-        question: trimmed,
+        documentId: documentId,
+        question: question,
       )) {
         switch (event.type) {
           case ChatSseEventType.token:
@@ -257,6 +397,15 @@ class ChatController extends Notifier<ChatState> {
               clearInFlightAnswerId: true,
               announcement: 'Answer complete',
             );
+            if (queueId != null) {
+              final namespace = await resolveUserCacheNamespace(ref);
+              await ref
+                  .read(localCacheStoreProvider)
+                  .removeQueuedQuestion(
+                    userNamespace: namespace,
+                    queueId: queueId,
+                  );
+            }
             return;
           case ChatSseEventType.error:
             final message = event.errorMessage ?? 'Answer streaming failed.';
@@ -281,7 +430,73 @@ class ChatController extends Notifier<ChatState> {
         clearInFlightAnswerId: true,
         errorMessage: error.message,
       );
+      rethrow;
     }
+  }
+
+  Future<void> _flushQueuedQuestions(String documentId) async {
+    if (_isFlushingQueuedQuestions || state.isStreaming) {
+      return;
+    }
+    if (!ref.read(connectivityServiceProvider).isOnline) {
+      return;
+    }
+
+    final now = DateTime.now().toUtc();
+    if (now.isBefore(_nextQueueFlushAt)) {
+      return;
+    }
+
+    _isFlushingQueuedQuestions = true;
+    try {
+      final namespace = await resolveUserCacheNamespace(ref);
+      final cache = ref.read(localCacheStoreProvider);
+      final allQueued = await cache.readQueuedQuestions(
+        userNamespace: namespace,
+      );
+      final queuedForCurrentDoc =
+          allQueued
+              .where((item) => item.documentId == documentId)
+              .toList(growable: false)
+            ..sort((a, b) => a.enqueuedAt.compareTo(b.enqueuedAt));
+
+      for (final queued in queuedForCurrentDoc) {
+        try {
+          await _streamAnswer(
+            documentId: documentId,
+            question: queued.question,
+            queueId: queued.id,
+          );
+          await _persistMessages();
+        } on ChatApiError {
+          _nextQueueFlushAt = DateTime.now().toUtc().add(_queueRetryBackoff);
+          return;
+        }
+      }
+    } finally {
+      _isFlushingQueuedQuestions = false;
+    }
+  }
+
+  Future<void> _persistMessages() async {
+    final documentId = state.documentId;
+    if (documentId == null) {
+      return;
+    }
+    final namespace = await resolveUserCacheNamespace(ref);
+    final cache = ref.read(localCacheStoreProvider);
+    await cache.cacheChatMessages(
+      userNamespace: namespace,
+      documentId: documentId,
+      messages: state.messages,
+    );
+  }
+
+  bool _isNetworkStyleError(ChatApiError error) {
+    final code = error.code.toUpperCase();
+    return code == 'NETWORK_ERROR' ||
+        code == 'CONNECTION_ERROR' ||
+        code == 'TIMEOUT';
   }
 
   void _appendToken(String token) {

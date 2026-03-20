@@ -1,16 +1,32 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:documind_ai/core/networking/connectivity_provider.dart';
+import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
 import 'package:documind_ai/features/library/data/file_picker_service.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
+import 'package:documind_ai/features/library/providers/document_list_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class DocumentUploadController extends Notifier<DocumentUploadState> {
+  static const Duration _queueRetryBackoff = Duration(seconds: 15);
+
   Timer? _pollTimer;
   bool _pollInFlight = false;
+  bool _flushInProgress = false;
+  DateTime _nextFlushAt = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
   @override
   DocumentUploadState build() {
+    final connectivity = ref.read(connectivityServiceProvider);
+    final sub = connectivity.onlineChanges.listen((isOnline) {
+      if (!isOnline) {
+        return;
+      }
+      unawaited(flushQueuedUploads());
+    });
+    ref.onDispose(sub.cancel);
     ref.onDispose(_stopPolling);
     return const DocumentUploadState.idle();
   }
@@ -26,6 +42,23 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
   }
 
   Future<void> uploadSelectedFile(SelectedPdfFile selectedFile) async {
+    final isOnline = ref.read(connectivityServiceProvider).isOnline;
+    if (!isOnline) {
+      await _enqueueUpload(selectedFile);
+      state = state.copyWith(
+        phase: UploadCardPhase.queued,
+        selectedFile: selectedFile,
+        clearProgress: true,
+        clearError: true,
+        announcement: 'Queued - will upload when online.',
+      );
+      return;
+    }
+
+    await _uploadOnline(selectedFile);
+  }
+
+  Future<bool> _uploadOnline(SelectedPdfFile selectedFile) async {
     _stopPolling();
     final api = ref.read(documentsApiProvider);
     state = state.copyWith(
@@ -61,7 +94,15 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
         clearError: true,
         announcement: '${uploaded.title} uploaded. Processing started.',
       );
+      if (ref.mounted) {
+        try {
+          await ref.read(documentListProvider.notifier).refresh();
+        } catch (_) {
+          // Keep upload success state even if list refresh fails.
+        }
+      }
       _startPolling(uploaded.id);
+      return true;
     } on LibraryApiError catch (error) {
       _stopPolling();
       state = state.copyWith(
@@ -71,6 +112,58 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
         error: error,
         announcement: 'Upload failed. ${error.message}',
       );
+      return false;
+    }
+  }
+
+  Future<void> flushQueuedUploads() async {
+    if (_flushInProgress || state.phase == UploadCardPhase.uploading) {
+      return;
+    }
+    if (!ref.read(connectivityServiceProvider).isOnline) {
+      return;
+    }
+
+    final now = DateTime.now().toUtc();
+    if (now.isBefore(_nextFlushAt)) {
+      return;
+    }
+
+    _flushInProgress = true;
+    try {
+      final cache = ref.read(localCacheStoreProvider);
+      final namespace = await resolveUserCacheNamespace(ref);
+      final queued = await cache.readQueuedUploads(userNamespace: namespace);
+
+      for (final item in queued) {
+        final selectedFile = _queuedUploadToSelectedFile(item);
+        if (selectedFile == null) {
+          await cache.removeQueuedUpload(
+            userNamespace: namespace,
+            queueId: item.id,
+          );
+          continue;
+        }
+
+        final success = await _uploadOnline(selectedFile);
+        if (success) {
+          await cache.removeQueuedUpload(
+            userNamespace: namespace,
+            queueId: item.id,
+          );
+        } else {
+          state = state.copyWith(
+            phase: UploadCardPhase.queued,
+            selectedFile: selectedFile,
+            clearProgress: true,
+            announcement: 'Upload still queued. Will retry when online.',
+          );
+          _nextFlushAt = DateTime.now().toUtc().add(_queueRetryBackoff);
+          return;
+        }
+      }
+    } finally {
+      _flushInProgress = false;
     }
   }
 
@@ -100,7 +193,41 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
     _pollInFlight = false;
   }
 
+  Future<void> _enqueueUpload(SelectedPdfFile selectedFile) async {
+    final cache = ref.read(localCacheStoreProvider);
+    final namespace = await resolveUserCacheNamespace(ref);
+
+    await cache.enqueueUpload(
+      userNamespace: namespace,
+      item: QueuedUploadItem(
+        id: QueueItemId.next(),
+        fileName: selectedFile.name,
+        fileSize: selectedFile.sizeInBytes,
+        filePath: selectedFile.path,
+        bytesBase64: encodeBytesForQueue(selectedFile.bytes),
+        enqueuedAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  SelectedPdfFile? _queuedUploadToSelectedFile(QueuedUploadItem item) {
+    final bytes = decodeBytesFromQueue(item.bytesBase64);
+    if (item.filePath == null && bytes == null) {
+      return null;
+    }
+
+    return SelectedPdfFile(
+      name: item.fileName,
+      sizeInBytes: item.fileSize,
+      path: item.filePath,
+      bytes: bytes == null ? null : Uint8List.fromList(bytes),
+    );
+  }
+
   Future<void> _pollDocumentStatus(String documentId) async {
+    if (!ref.mounted) {
+      return;
+    }
     if (_pollInFlight) {
       return;
     }
@@ -112,6 +239,10 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
       final nextPhase = _phaseForStatus(latest.status);
       final previousStatus = state.uploadedDocument?.status;
       final statusChanged = previousStatus != latest.status;
+
+      if (!ref.mounted) {
+        return;
+      }
 
       state = state.copyWith(
         phase: nextPhase,

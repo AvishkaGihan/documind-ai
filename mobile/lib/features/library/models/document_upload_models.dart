@@ -90,6 +90,7 @@ class DocumentListResponse {
 
 enum UploadCardPhase {
   idle,
+  queued,
   uploading,
   processing,
   ready,
