@@ -32,6 +32,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      splashFactory: InkRipple.splashFactory,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: palette.surfacePrimary,
       textTheme: AppTypography.buildTextTheme(palette),

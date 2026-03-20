@@ -42,6 +42,38 @@ void main() {
     expect(find.byKey(const Key('library-empty-upload-cta')), findsOneWidget);
   });
 
+  testWidgets('loading branch renders exactly three skeleton cards', (
+    WidgetTester tester,
+  ) async {
+    final completer = Completer<DocumentListResponse>();
+    final api = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) {
+        return completer.future;
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(api));
+    await tester.pump(const Duration(milliseconds: 60));
+
+    expect(
+      find.byKey(const Key('library-loading-skeleton-list')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('library-loading-skeleton-card-0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('library-loading-skeleton-card-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('library-loading-skeleton-card-2')),
+      findsOneWidget,
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('renders list items using builder state when documents exist', (
     WidgetTester tester,
   ) async {
@@ -106,7 +138,9 @@ void main() {
           tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
         ],
         child: MaterialApp.router(
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
           routerConfig: router,
         ),
       ),
@@ -328,6 +362,68 @@ void main() {
     expect(readyY, lessThan(errorY));
   });
 
+  testWidgets('processing documents render shared processing feedback widget', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        return DocumentListResponse(
+          items: [
+            _doc(id: 'doc-processing', title: 'Processing', status: 'chunking'),
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 100,
+        );
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(api));
+    await pumpFrames(tester);
+
+    expect(
+      find.byKey(const Key('document-card-doc-processing')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('processing-status-chunking')), findsOneWidget);
+  });
+
+  testWidgets(
+    'reduce motion renders loading and processing UI without exceptions',
+    (WidgetTester tester) async {
+      final api = _FakeDocumentsApi(
+        getDocumentsHandler: ({required page, required pageSize}) async {
+          return DocumentListResponse(
+            items: [
+              _doc(
+                id: 'doc-processing',
+                title: 'Reduce Motion',
+                status: 'extracting',
+              ),
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 100,
+          );
+        },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          api,
+          mediaQueryData: const MediaQueryData(disableAnimations: true),
+        ),
+      );
+      await pumpFrames(tester);
+
+      expect(
+        find.byKey(const Key('processing-status-extracting')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     '320px width uses single-column responsive library layout without overflow',
     (WidgetTester tester) async {
@@ -398,7 +494,7 @@ void _setScreenSize(WidgetTester tester, Size size) {
   addTearDown(view.resetDevicePixelRatio);
 }
 
-Widget _buildApp(_FakeDocumentsApi api) {
+Widget _buildApp(_FakeDocumentsApi api, {MediaQueryData? mediaQueryData}) {
   return ProviderScope(
     overrides: [
       documentsApiProvider.overrideWithValue(api),
@@ -408,7 +504,20 @@ Widget _buildApp(_FakeDocumentsApi api) {
       localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
       tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
     ],
-    child: MaterialApp(theme: AppTheme.darkTheme, home: const LibraryScreen()),
+    child: MaterialApp(
+      theme: AppTheme.darkTheme.copyWith(
+        splashFactory: InkRipple.splashFactory,
+      ),
+      home: Builder(
+        builder: (context) {
+          final screen = const LibraryScreen();
+          if (mediaQueryData == null) {
+            return screen;
+          }
+          return MediaQuery(data: mediaQueryData, child: screen);
+        },
+      ),
+    ),
   );
 }
 
