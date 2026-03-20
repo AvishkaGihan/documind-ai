@@ -39,6 +39,8 @@ void main() {
   testWidgets('renders list items using builder state when documents exist', (
     WidgetTester tester,
   ) async {
+    _setScreenSize(tester, const Size(390, 844));
+
     final api = _FakeDocumentsApi(
       getDocumentsHandler: ({required page, required pageSize}) async {
         return DocumentListResponse(
@@ -53,7 +55,7 @@ void main() {
     await tester.pumpWidget(_buildApp(api));
     await pumpFrames(tester);
 
-    expect(find.byKey(const Key('library-document-list')), findsOneWidget);
+    expect(find.byKey(const Key('library-layout-list')), findsOneWidget);
     expect(find.text('Annual Report'), findsOneWidget);
   });
 
@@ -234,6 +236,8 @@ void main() {
   testWidgets('sort by name produces deterministic alphabetical ordering', (
     WidgetTester tester,
   ) async {
+    _setScreenSize(tester, const Size(390, 844));
+
     final api = _FakeDocumentsApi(
       getDocumentsHandler: ({required page, required pageSize}) async {
         return DocumentListResponse(
@@ -270,6 +274,8 @@ void main() {
   testWidgets('sort by status places processing documents first', (
     WidgetTester tester,
   ) async {
+    _setScreenSize(tester, const Size(390, 844));
+
     final api = _FakeDocumentsApi(
       getDocumentsHandler: ({required page, required pageSize}) async {
         return DocumentListResponse(
@@ -308,10 +314,76 @@ void main() {
     expect(processingY, lessThan(readyY));
     expect(readyY, lessThan(errorY));
   });
+
+  testWidgets(
+    '320px width uses single-column responsive library layout without overflow',
+    (WidgetTester tester) async {
+      _setScreenSize(tester, const Size(320, 800));
+
+      final api = _FakeDocumentsApi(
+        getDocumentsHandler: ({required page, required pageSize}) async {
+          return DocumentListResponse(
+            items: [
+              _doc(
+                id: 'doc-long',
+                title:
+                    'Very long document title that should remain readable on a compact phone layout',
+              ),
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 100,
+          );
+        },
+      );
+
+      await tester.pumpWidget(_buildApp(api));
+      await pumpFrames(tester);
+
+      expect(find.byKey(const Key('library-layout-list')), findsOneWidget);
+      expect(find.byKey(const Key('library-layout-grid')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('800px width uses tablet grid responsive library layout', (
+    WidgetTester tester,
+  ) async {
+    _setScreenSize(tester, const Size(800, 1024));
+
+    final api = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        return DocumentListResponse(
+          items: [
+            _doc(id: 'doc-1', title: 'Tablet Doc 1'),
+            _doc(id: 'doc-2', title: 'Tablet Doc 2'),
+          ],
+          total: 2,
+          page: 1,
+          pageSize: 100,
+        );
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(api));
+    await pumpFrames(tester);
+
+    expect(find.byKey(const Key('library-layout-grid')), findsOneWidget);
+    expect(find.text('Tablet Doc 1'), findsOneWidget);
+    expect(find.text('Tablet Doc 2'), findsOneWidget);
+  });
 }
 
 int apiGetCallCount = 0;
 final List<String> deletedIds = <String>[];
+
+void _setScreenSize(WidgetTester tester, Size size) {
+  final view = tester.view;
+  view.physicalSize = size;
+  view.devicePixelRatio = 1;
+  addTearDown(view.resetPhysicalSize);
+  addTearDown(view.resetDevicePixelRatio);
+}
 
 Widget _buildApp(_FakeDocumentsApi api) {
   return ProviderScope(

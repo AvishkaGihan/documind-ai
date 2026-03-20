@@ -1,3 +1,4 @@
+import 'package:documind_ai/core/layout/responsive_breakpoints.dart';
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
@@ -40,6 +41,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final widthClass = classifyScreenWidth(MediaQuery.sizeOf(context).width);
+    final loadingPadding = widthClass.isSmallPhone
+        ? AppSpacing.md
+        : AppSpacing.lg;
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
     final uploadState = ref.watch(documentUploadControllerProvider);
@@ -205,7 +210,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             );
           },
           loading: () => ListView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: EdgeInsets.all(loadingPadding),
             children: [
               const SizedBox(height: AppSpacing.xl),
               Center(
@@ -216,7 +221,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ],
           ),
           error: (error, _) => ListView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: EdgeInsets.all(loadingPadding),
             children: [
               Text(
                 'Unable to load documents right now.',
@@ -477,6 +482,7 @@ class _LibraryContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
+    final widthClass = classifyScreenWidth(MediaQuery.sizeOf(context).width);
     final showUploadCard = uploadState.phase != UploadCardPhase.idle;
     final showNoResults =
         searchQuery.trim().isNotEmpty && documents.isEmpty && hasAnyDocuments;
@@ -516,9 +522,15 @@ class _LibraryContent extends StatelessWidget {
       ];
     }
 
+    final horizontalPadding = widthClass.isSmallPhone
+        ? AppSpacing.md
+        : AppSpacing.lg;
+    final itemSpacing = widthClass.isSmallPhone ? AppSpacing.sm : AppSpacing.md;
+
     if (isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        key: const Key('library-layout-list'),
+        padding: EdgeInsets.all(horizontalPadding),
         children: [
           ...buildSearchHeader(),
           const SizedBox(height: AppSpacing.x2l),
@@ -569,11 +581,149 @@ class _LibraryContent extends StatelessWidget {
       );
     }
 
-    final children = <Widget>[
-      ...buildSearchHeader(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final constrainedWidthClass = classifyScreenWidth(width);
+
+        if (constrainedWidthClass.isTablet) {
+          return _buildTabletGrid(
+            context: context,
+            showUploadCard: showUploadCard,
+            showNoResults: showNoResults,
+            searchHeader: buildSearchHeader(),
+            horizontalPadding: horizontalPadding,
+            itemSpacing: itemSpacing,
+          );
+        }
+
+        return _buildPhoneList(
+          context: context,
+          showUploadCard: showUploadCard,
+          showNoResults: showNoResults,
+          searchHeader: buildSearchHeader(),
+          horizontalPadding: horizontalPadding,
+          itemSpacing: itemSpacing,
+        );
+      },
+    );
+  }
+
+  Widget _buildPhoneList({
+    required BuildContext context,
+    required bool showUploadCard,
+    required bool showNoResults,
+    required List<Widget> searchHeader,
+    required double horizontalPadding,
+    required double itemSpacing,
+  }) {
+    final totalCount =
+        searchHeader.length +
+        (showUploadCard ? 1 : 0) +
+        (showNoResults ? 1 : 0) +
+        documents.length +
+        (isSearching ? 1 : 0);
+
+    return ListView.builder(
+      key: const Key('library-layout-list'),
+      padding: EdgeInsets.all(horizontalPadding),
+      itemCount: totalCount,
+      itemBuilder: (context, index) {
+        var cursor = 0;
+
+        if (index < searchHeader.length) {
+          return searchHeader[index];
+        }
+        cursor += searchHeader.length;
+
+        if (showUploadCard && index == cursor) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: itemSpacing),
+            child: DocumentUploadCard(
+              state: uploadState,
+              onRetry: onUploadRetry,
+              onReadyTap: onUploadReadyTap,
+            ),
+          );
+        }
+        if (showUploadCard) {
+          cursor += 1;
+        }
+
+        if (showNoResults && index == cursor) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+            child: Center(
+              child: Column(
+                children: [
+                  Text(
+                    'No documents match your search',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).extension<DocuMindTokens>()!.colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton(
+                    key: const Key('library-clear-search-empty'),
+                    onPressed: onClearSearch,
+                    child: const Text('Clear search'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        if (showNoResults) {
+          cursor += 1;
+        }
+
+        final documentIndex = index - cursor;
+        if (documentIndex >= 0 && documentIndex < documents.length) {
+          final document = documents[documentIndex];
+          return Padding(
+            padding: EdgeInsets.only(bottom: itemSpacing),
+            child: Hero(
+              tag: 'document-${document.id}',
+              child: DocumentCard(
+                document: document,
+                onTap: () => onDocumentTap(document),
+                onLongPress: () => onDocumentLongPress(document),
+              ),
+            ),
+          );
+        }
+
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const Key('library-close-search'),
+            onPressed: onCloseSearch,
+            child: const Text('Cancel search'),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabletGrid({
+    required BuildContext context,
+    required bool showUploadCard,
+    required bool showNoResults,
+    required List<Widget> searchHeader,
+    required double horizontalPadding,
+    required double itemSpacing,
+  }) {
+    final topItems = <Widget>[
+      ...searchHeader,
       if (showUploadCard)
         Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: EdgeInsets.only(bottom: itemSpacing),
           child: DocumentUploadCard(
             state: uploadState,
             onRetry: onUploadRetry,
@@ -589,8 +739,10 @@ class _LibraryContent extends StatelessWidget {
                 Text(
                   'No documents match your search',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: tokens.colors.textPrimary,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).extension<DocuMindTokens>()!.colors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -604,34 +756,66 @@ class _LibraryContent extends StatelessWidget {
             ),
           ),
         ),
-      ...documents.map(
-        (document) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: Hero(
-            tag: 'document-${document.id}',
-            child: DocumentCard(
-              document: document,
-              onTap: () => onDocumentTap(document),
-              onLongPress: () => onDocumentLongPress(document),
+    ];
+
+    return CustomScrollView(
+      key: const Key('library-layout-grid'),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            horizontalPadding,
+            horizontalPadding,
+            0,
+          ),
+          sliver: SliverList(delegate: SliverChildListDelegate(topItems)),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            0,
+            horizontalPadding,
+            horizontalPadding,
+          ),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final document = documents[index];
+              return Hero(
+                tag: 'document-${document.id}',
+                child: DocumentCard(
+                  document: document,
+                  onTap: () => onDocumentTap(document),
+                  onLongPress: () => onDocumentLongPress(document),
+                ),
+              );
+            }, childCount: documents.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: itemSpacing,
+              mainAxisSpacing: itemSpacing,
+              childAspectRatio: 1.95,
             ),
           ),
         ),
-      ),
-      if (isSearching)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            key: const Key('library-close-search'),
-            onPressed: onCloseSearch,
-            child: const Text('Cancel search'),
+        if (isSearching)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: horizontalPadding,
+                right: horizontalPadding,
+                bottom: horizontalPadding,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const Key('library-close-search'),
+                  onPressed: onCloseSearch,
+                  child: const Text('Cancel search'),
+                ),
+              ),
+            ),
           ),
-        ),
-    ];
-
-    return ListView(
-      key: const Key('library-document-list'),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: children,
+      ],
     );
   }
 }

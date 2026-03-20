@@ -119,6 +119,59 @@ void main() {
     expect(find.text('C message'), findsOneWidget);
     expect(find.text('A message'), findsNothing);
   });
+
+  testWidgets('800px width shows tablet split layout with document pane', (
+    WidgetTester tester,
+  ) async {
+    _setScreenSize(tester, const Size(800, 1024));
+
+    final chatApi = _FakeChatApi(
+      bootstrapByDocumentId: {
+        'doc-a': _bootstrap(title: 'Document A', message: 'A message'),
+      },
+    );
+    final documentsApi = _FakeDocumentsApi(
+      docs: [
+        UploadedDocument(
+          id: 'doc-a',
+          title: 'Document A',
+          fileSize: 100,
+          pageCount: 1,
+          status: 'ready',
+          errorMessage: null,
+          createdAt: DateTime(2026, 3, 20, 9),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatApiProvider.overrideWithValue(chatApi),
+          documentsApiProvider.overrideWithValue(documentsApi),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: const ChatScreen(documentId: 'doc-a'),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.byKey(const Key('chat-tablet-split-layout')), findsOneWidget);
+    expect(find.byKey(const Key('chat-tablet-document-pane')), findsOneWidget);
+    expect(find.byKey(const Key('chat-tablet-chat-pane')), findsOneWidget);
+    expect(find.byKey(const Key('chat-tablet-document-doc-a')), findsOneWidget);
+  });
+}
+
+void _setScreenSize(WidgetTester tester, Size size) {
+  final view = tester.view;
+  view.physicalSize = size;
+  view.devicePixelRatio = 1;
+  addTearDown(view.resetPhysicalSize);
+  addTearDown(view.resetDevicePixelRatio);
 }
 
 DocumentChatBootstrap _bootstrap({

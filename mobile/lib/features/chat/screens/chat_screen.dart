@@ -1,3 +1,4 @@
+import 'package:documind_ai/core/layout/responsive_breakpoints.dart';
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/chat/models/chat_models.dart';
@@ -26,6 +27,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   late final ScrollController _scrollController;
   late final TextEditingController _inputController;
+  final Set<String> _pendingAnimatedMessageIds = <String>{};
 
   @override
   void initState() {
@@ -87,6 +89,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               duration: const Duration(days: 1),
             ),
           );
+      }
+
+      if (previous != null) {
+        final previousIds = previous.messages
+            .map((message) => message.id)
+            .toSet();
+        for (final message in next.messages) {
+          if (!previousIds.contains(message.id)) {
+            _pendingAnimatedMessageIds.add(message.id);
+          }
+        }
       }
 
       final hadDifferentLength =
@@ -156,30 +169,150 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       backgroundColor: tokens.colors.surfacePrimary,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: chatState.isLoading
-                  ? Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width;
+            final widthClass = classifyScreenWidth(width);
+
+            if (widthClass.isTablet) {
+              return Row(
+                key: const Key('chat-tablet-split-layout'),
+                children: [
+                  Flexible(flex: 4, child: _buildTabletDocumentPane(context)),
+                  const VerticalDivider(width: 1),
+                  Flexible(
+                    flex: 7,
+                    child: _buildChatPane(
+                      context: context,
+                      chatState: chatState,
+                      key: const Key('chat-tablet-chat-pane'),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return _buildChatPane(context: context, chatState: chatState);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatPane({
+    required BuildContext context,
+    required ChatState chatState,
+    Key? key,
+  }) {
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+
+    return Column(
+      key: key,
+      children: [
+        Expanded(
+          child: chatState.isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: tokens.colors.accentPrimary,
+                  ),
+                )
+              : _buildMessagePane(context, chatState),
+        ),
+        ChatInputBar(
+          controller: _inputController,
+          onChanged: (value) {
+            ref.read(chatControllerProvider.notifier).updateDraft(value);
+          },
+          onSend: () {
+            final question = _inputController.text;
+            ref.read(chatControllerProvider.notifier).send(question);
+          },
+          isSending: chatState.isStreaming,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabletDocumentPane(BuildContext context) {
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+
+    return DecoratedBox(
+      key: const Key('chat-tablet-document-pane'),
+      decoration: BoxDecoration(color: tokens.colors.surfaceSecondary),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Ready Documents',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Consumer(
+              builder: (context, ref, child) {
+                final documentsAsync = ref.watch(documentListProvider);
+                return documentsAsync.when(
+                  data: (response) {
+                    final readyDocuments = response.items
+                        .where((doc) => doc.status == 'ready')
+                        .toList(growable: false);
+
+                    if (readyDocuments.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(AppSpacing.md),
+                          child: Text('No ready documents available.'),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: readyDocuments.length,
+                      itemBuilder: (context, index) {
+                        final document = readyDocuments[index];
+                        return ListTile(
+                          key: Key('chat-tablet-document-${document.id}'),
+                          title: Text(
+                            document.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          selected: document.id == widget.documentId,
+                          onTap: () {
+                            if (document.id != widget.documentId) {
+                              context.go('/chat/${document.id}');
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                  error: (error, stackTrace) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppSpacing.md),
+                        child: Text('Unable to load documents.'),
+                      ),
+                    );
+                  },
+                  loading: () {
+                    return Center(
                       child: CircularProgressIndicator(
                         color: tokens.colors.accentPrimary,
                       ),
-                    )
-                  : _buildMessagePane(context, chatState),
-            ),
-            ChatInputBar(
-              controller: _inputController,
-              onChanged: (value) {
-                ref.read(chatControllerProvider.notifier).updateDraft(value);
+                    );
+                  },
+                );
               },
-              onSend: () {
-                final question = _inputController.text;
-                ref.read(chatControllerProvider.notifier).send(question);
-              },
-              isSending: chatState.isStreaming,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -359,6 +492,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildMessagePane(BuildContext context, ChatState chatState) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
 
@@ -412,10 +548,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
 
         final message = chatState.messages[index];
+        final bubble = message.role == ChatRole.user
+            ? UserQuestionBubble(text: message.content)
+            : AiResponseBubble(
+                message: message,
+                expandedPages: chatState.expandedCitationPages,
+                citationExcerpts: chatState.citationExcerpts,
+                onToggleCitation: (page) {
+                  ref
+                      .read(chatControllerProvider.notifier)
+                      .toggleCitation(page);
+                },
+              );
+
+        final shouldAnimate =
+            !reduceMotion && _pendingAnimatedMessageIds.remove(message.id);
+        if (!shouldAnimate) {
+          return bubble;
+        }
+
         return TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 340),
-          curve: Curves.easeOutBack,
-          tween: Tween<double>(begin: 0.94, end: 1),
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOut,
+          tween: Tween<double>(begin: 0.97, end: 1),
+          child: bubble,
           builder: (context, value, child) {
             return Opacity(
               opacity: value.clamp(0, 1),
@@ -426,18 +582,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             );
           },
-          child: message.role == ChatRole.user
-              ? UserQuestionBubble(text: message.content)
-              : AiResponseBubble(
-                  message: message,
-                  expandedPages: chatState.expandedCitationPages,
-                  citationExcerpts: chatState.citationExcerpts,
-                  onToggleCitation: (page) {
-                    ref
-                        .read(chatControllerProvider.notifier)
-                        .toggleCitation(page);
-                  },
-                ),
         );
       },
     );
@@ -460,6 +604,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!_scrollController.hasClients) {
         return;
       }
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (reduceMotion) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        return;
+      }
+
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 200),
