@@ -300,6 +300,45 @@ async def create_new_conversation(
 
 
 @router.get(
+    "/{document_id}/conversations/latest/messages",
+    response_model=MessageListResponse,
+)
+async def list_latest_conversation_messages(
+    document_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> MessageListResponse:
+    document_service = DocumentService(session)
+    conversation_service = ConversationService(session)
+
+    try:
+        await document_service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        messages = await conversation_service.list_messages_for_latest_conversation(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+
+    items = [MessagePublic.model_validate(message) for message in messages]
+    return MessageListResponse(
+        items=items,
+        total=len(items),
+        page=1,
+        page_size=len(items),
+    )
+
+
+@router.get(
     "/{document_id}/conversations/{conversation_id}/messages",
     response_model=MessageListResponse,
 )

@@ -127,7 +127,7 @@ void main() {
 
     await tester.tap(find.text('Chat').first);
     await pumpFrames(tester, 6);
-    expect(find.text('Chat Screen Placeholder: active'), findsOneWidget);
+    expect(find.byKey(const Key('chat-input-bar')), findsOneWidget);
   });
 }
 

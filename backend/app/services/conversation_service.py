@@ -108,6 +108,25 @@ class ConversationService:
             raise ConversationNotFoundError
         return []
 
+    async def list_messages_for_latest_conversation(
+        self,
+        *,
+        user_id: UUID,
+        document_id: UUID,
+    ) -> list[Message]:
+        conversation = await get_latest_conversation_for_document(
+            self._session,
+            user_id=user_id,
+            document_id=document_id,
+        )
+        if conversation is None:
+            return []
+
+        return await list_messages_by_conversation(
+            self._session,
+            conversation_id=conversation.id,
+        )
+
     async def persist_qa_exchange(
         self,
         *,

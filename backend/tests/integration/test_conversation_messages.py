@@ -154,3 +154,79 @@ def test_list_messages_returns_chronological_order_and_list_envelope(
     assert payload["page_size"] == 2
     assert [item["content"] for item in payload["items"]] == ["first", "second"]
     assert [item["role"] for item in payload["items"]] == ["user", "assistant"]
+
+
+def test_list_latest_messages_returns_empty_when_no_conversation(
+    client,
+    test_session_factory,
+) -> None:
+    headers, user_id = _auth_headers(client, "msg-latest-empty@example.com")
+    document_id = _create_document_for_user(
+        test_session_factory=test_session_factory,
+        user_id=user_id,
+    )
+
+    response = client.get(
+        f"/api/v1/documents/{document_id}/conversations/latest/messages",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 0, "page": 1, "page_size": 0}
+
+
+def test_list_latest_messages_uses_most_recent_conversation(
+    client,
+    test_session_factory,
+) -> None:
+    headers, user_id = _auth_headers(client, "msg-latest-recent@example.com")
+    document_id = _create_document_for_user(
+        test_session_factory=test_session_factory,
+        user_id=user_id,
+    )
+
+    old_conversation_id = _seed_conversation_messages(
+        test_session_factory=test_session_factory,
+        user_id=user_id,
+        document_id=document_id,
+    )
+
+    new_conversation_id = uuid4()
+
+    async def _seed_latest() -> None:
+        async with test_session_factory() as session:
+            session.add(
+                Conversation(
+                    id=new_conversation_id,
+                    user_id=user_id,
+                    document_id=document_id,
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            session.add(
+                Message(
+                    conversation_id=new_conversation_id,
+                    role=MessageRole.ASSISTANT,
+                    content="latest",
+                    citations=[],
+                    created_at=datetime.now(UTC),
+                )
+            )
+            # Keep the first conversation older so latest resolution is deterministic.
+            existing = await session.get(Conversation, old_conversation_id)
+            assert existing is not None
+            existing.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+            await session.commit()
+
+    asyncio.run(_seed_latest())
+
+    response = client.get(
+        f"/api/v1/documents/{document_id}/conversations/latest/messages",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["content"] == "latest"
