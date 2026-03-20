@@ -6,10 +6,13 @@ import 'package:documind_ai/features/chat/widgets/ai_response_bubble.dart';
 import 'package:documind_ai/features/chat/widgets/ai_typing_indicator.dart';
 import 'package:documind_ai/features/chat/widgets/chat_input_bar.dart';
 import 'package:documind_ai/features/chat/widgets/user_question_bubble.dart';
+import 'package:documind_ai/features/library/providers/document_list_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+enum _ChatAction { conversationHistory }
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({required this.documentId, super.key});
@@ -39,7 +42,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void didUpdateWidget(covariant ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.documentId != widget.documentId) {
-      ref.read(chatControllerProvider.notifier).load(widget.documentId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        ref.read(chatControllerProvider.notifier).load(widget.documentId);
+      });
     }
   }
 
@@ -103,7 +111,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: Text(title), centerTitle: false),
+      appBar: AppBar(
+        centerTitle: false,
+        title: InkWell(
+          key: const Key('chat-document-selector-button'),
+          onTap: _openDocumentSelector,
+          borderRadius: BorderRadius.circular(AppSpacing.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xs,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(Icons.keyboard_arrow_down_rounded),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            key: const Key('chat-new-conversation-button'),
+            tooltip: 'New Conversation',
+            onPressed: _confirmNewConversation,
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
+          PopupMenuButton<_ChatAction>(
+            key: const Key('chat-overflow-menu'),
+            onSelected: (action) async {
+              await _openConversationHistory();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<_ChatAction>(
+                value: _ChatAction.conversationHistory,
+                key: Key('chat-menu-conversation-history'),
+                child: Text('Conversation history'),
+              ),
+            ],
+          ),
+        ],
+      ),
       backgroundColor: tokens.colors.surfacePrimary,
       body: SafeArea(
         child: Column(
@@ -132,6 +182,180 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openDocumentSelector() async {
+    await ref.read(documentListProvider.notifier).refresh();
+    if (!mounted) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return Consumer(
+          builder: (context, ref, child) {
+            final documentsAsync = ref.watch(documentListProvider);
+            return documentsAsync.when(
+              data: (response) {
+                final readyDocuments = response.items
+                    .where((doc) => doc.status == 'ready')
+                    .toList(growable: false);
+
+                if (readyDocuments.isEmpty) {
+                  return const SizedBox(
+                    key: Key('chat-document-selector-sheet'),
+                    height: 200,
+                    child: Center(child: Text('No ready documents available.')),
+                  );
+                }
+
+                return SafeArea(
+                  child: ListView.builder(
+                    key: const Key('chat-document-selector-sheet'),
+                    itemCount: readyDocuments.length,
+                    itemBuilder: (context, index) {
+                      final document = readyDocuments[index];
+                      return ListTile(
+                        key: Key('chat-document-option-${document.id}'),
+                        title: Text(document.title),
+                        trailing: document.id == widget.documentId
+                            ? const Icon(Icons.check)
+                            : null,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          if (document.id != widget.documentId) {
+                            context.go('/chat/${document.id}');
+                          }
+                        },
+                      );
+                    },
+                  ),
+                );
+              },
+              error: (error, stackTrace) {
+                return const SizedBox(
+                  key: Key('chat-document-selector-sheet'),
+                  height: 200,
+                  child: Center(child: Text('Unable to load documents.')),
+                );
+              },
+              loading: () {
+                final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+                return SizedBox(
+                  key: const Key('chat-document-selector-sheet'),
+                  height: 200,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: tokens.colors.accentPrimary,
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmNewConversation() async {
+    final shouldStart = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Start a new conversation?'),
+          content: const Text(
+            'This clears the current chat view and starts a fresh conversation.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('chat-confirm-new-conversation-button'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Start New'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldStart != true || !mounted) {
+      return;
+    }
+
+    await ref.read(chatControllerProvider.notifier).startNewConversation();
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Conversation cleared.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Future<void> _openConversationHistory() async {
+    final controller = ref.read(chatControllerProvider.notifier);
+    List<ConversationSession> sessions;
+    try {
+      sessions = await controller.listConversationHistory();
+    } on Exception {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        if (sessions.isEmpty) {
+          return const SizedBox(
+            key: Key('chat-conversation-history-sheet'),
+            height: 200,
+            child: Center(child: Text('No previous conversations yet.')),
+          );
+        }
+
+        return ListView.builder(
+          key: const Key('chat-conversation-history-sheet'),
+          itemCount: sessions.length,
+          itemBuilder: (context, index) {
+            final session = sessions[index];
+            final subtitle = _formatConversationLabel(session.updatedAt);
+            return ListTile(
+              key: Key('chat-conversation-option-${session.id}'),
+              title: Text('Conversation ${index + 1}'),
+              subtitle: Text(subtitle),
+              onTap: () async {
+                Navigator.of(sheetContext).pop();
+                await controller.activateConversation(session.id);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatConversationLabel(DateTime timestamp) {
+    final utc = timestamp.toUtc();
+    final month = utc.month.toString().padLeft(2, '0');
+    final day = utc.day.toString().padLeft(2, '0');
+    final hour = utc.hour.toString().padLeft(2, '0');
+    final minute = utc.minute.toString().padLeft(2, '0');
+    return 'Updated $month/$day ${utc.year} $hour:$minute UTC';
   }
 
   Widget _buildMessagePane(BuildContext context, ChatState chatState) {

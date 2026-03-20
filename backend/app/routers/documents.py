@@ -23,7 +23,12 @@ from app.core.sse import format_sse_event
 from app.database import get_async_session
 from app.dependencies.auth import CurrentUser
 from app.routers.errors import build_error_detail
-from app.schemas.conversations import CreateConversationResponse
+from app.schemas.conversations import (
+    ActivateConversationResponse,
+    ConversationListResponse,
+    ConversationPublic,
+    CreateConversationResponse,
+)
 from app.schemas.documents import DocumentListResponse, DocumentPublic
 from app.schemas.messages import MessageListResponse, MessagePublic
 from app.schemas.qa import AskQuestionRequest, AskQuestionResponse
@@ -336,6 +341,88 @@ async def list_latest_conversation_messages(
         page=1,
         page_size=len(items),
     )
+
+
+@router.get(
+    "/{document_id}/conversations",
+    response_model=ConversationListResponse,
+)
+async def list_document_conversations(
+    document_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> ConversationListResponse:
+    document_service = DocumentService(session)
+    conversation_service = ConversationService(session)
+
+    try:
+        await document_service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        conversations = await conversation_service.list_conversations_for_document(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+
+    items = [ConversationPublic.model_validate(item) for item in conversations]
+    return ConversationListResponse(
+        items=items,
+        total=len(items),
+        page=1,
+        page_size=len(items),
+    )
+
+
+@router.post(
+    "/{document_id}/conversations/{conversation_id}/activate",
+    response_model=ActivateConversationResponse,
+)
+async def activate_document_conversation(
+    document_id: UUID,
+    conversation_id: UUID,
+    current_user: CurrentUser,
+    session: AsyncSession = async_session_dependency,
+) -> ActivateConversationResponse:
+    document_service = DocumentService(session)
+    conversation_service = ConversationService(session)
+
+    try:
+        await document_service.get_document_for_user(
+            user_id=current_user.id,
+            document_id=document_id,
+        )
+        conversation = await conversation_service.activate_conversation(
+            user_id=current_user.id,
+            document_id=document_id,
+            conversation_id=conversation_id,
+        )
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="DOCUMENT_NOT_FOUND",
+                message="Document not found.",
+            ),
+        ) from exc
+    except ConversationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=build_error_detail(
+                code="CONVERSATION_NOT_FOUND",
+                message="Conversation not found.",
+            ),
+        ) from exc
+
+    return ActivateConversationResponse(conversation_id=conversation.id)
 
 
 @router.get(

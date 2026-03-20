@@ -101,3 +101,40 @@ async def touch_conversation(
     if conversation is not None:
         conversation.updated_at = datetime.now(UTC)
         await session.flush()
+
+
+async def list_conversations_for_scope(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+) -> list[Conversation]:
+    result = await session.execute(
+        select(Conversation)
+        .where(
+            Conversation.user_id == user_id,
+            Conversation.document_id == document_id,
+        )
+        .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def activate_conversation_for_scope(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    document_id: UUID,
+    conversation_id: UUID,
+) -> Conversation | None:
+    conversation = await get_conversation_for_scope(
+        session,
+        user_id=user_id,
+        document_id=document_id,
+        conversation_id=conversation_id,
+    )
+    if conversation is None:
+        return None
+
+    await touch_conversation(session, conversation_id=conversation.id)
+    return conversation

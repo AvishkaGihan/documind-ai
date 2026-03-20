@@ -85,7 +85,13 @@ class ChatController extends Notifier<ChatState> {
   Future<void> load(String documentId) async {
     state = state.copyWith(
       documentId: documentId,
+      messages: const <ChatMessage>[],
+      inputDraft: '',
       isLoading: true,
+      isStreaming: false,
+      clearInFlightAnswerId: true,
+      citationExcerpts: const <int, String>{},
+      expandedCitationPages: const <int>{},
       clearErrorMessage: true,
       clearAnnouncement: true,
     );
@@ -109,6 +115,61 @@ class ChatController extends Notifier<ChatState> {
         errorMessage: error.message,
         isDocumentReady: error.code != 'DOCUMENT_NOT_READY',
       );
+    }
+  }
+
+  Future<void> startNewConversation() async {
+    final documentId = state.documentId;
+    if (documentId == null || state.isLoading) {
+      return;
+    }
+
+    state = state.copyWith(
+      messages: const <ChatMessage>[],
+      inputDraft: '',
+      isStreaming: false,
+      clearInFlightAnswerId: true,
+      citationExcerpts: const <int, String>{},
+      expandedCitationPages: const <int>{},
+      clearErrorMessage: true,
+      clearAnnouncement: true,
+    );
+
+    final api = ref.read(chatApiProvider);
+    try {
+      await api.createNewConversation(documentId);
+      await load(documentId);
+    } on ChatApiError catch (error) {
+      await load(documentId);
+      state = state.copyWith(errorMessage: error.message);
+    }
+  }
+
+  Future<List<ConversationSession>> listConversationHistory() async {
+    final documentId = state.documentId;
+    if (documentId == null) {
+      return const <ConversationSession>[];
+    }
+
+    final api = ref.read(chatApiProvider);
+    return api.listConversations(documentId);
+  }
+
+  Future<void> activateConversation(String conversationId) async {
+    final documentId = state.documentId;
+    if (documentId == null || state.isLoading) {
+      return;
+    }
+
+    final api = ref.read(chatApiProvider);
+    try {
+      await api.activateConversation(
+        documentId: documentId,
+        conversationId: conversationId,
+      );
+      await load(documentId);
+    } on ChatApiError catch (error) {
+      state = state.copyWith(errorMessage: error.message);
     }
   }
 
