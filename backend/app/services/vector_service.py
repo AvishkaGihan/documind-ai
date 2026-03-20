@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 else:
     Chunk = Any
 
-DEFAULT_SIMILARITY_THRESHOLD = 0.75
+DEFAULT_SIMILARITY_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
