@@ -155,7 +155,7 @@ void main() {
 
     await tester.tap(find.text('Settings').first);
     await pumpFrames(tester, 6);
-    expect(find.text('Settings Screen Placeholder'), findsOneWidget);
+    expect(find.byKey(const Key('settings-email-header')), findsOneWidget);
 
     await tester.tap(find.text('Chat').first);
     await pumpFrames(tester, 6);
