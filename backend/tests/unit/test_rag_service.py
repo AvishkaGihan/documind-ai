@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.qa import AskQuestionRequest
-from app.services.rag_service import FALLBACK_NO_RELEVANT_INFO, RagService
+from app.services.rag_service import RagService
 from app.services.vector_service import RetrievedChunk
 
 

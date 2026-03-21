@@ -2,7 +2,7 @@ import asyncio
 from uuid import uuid4
 
 from app.services.llm_service import LlmServiceError
-from app.services.rag_service import FALLBACK_NO_RELEVANT_INFO, RagService
+from app.services.rag_service import RagService
 from app.services.vector_service import RetrievedChunk
 
 
