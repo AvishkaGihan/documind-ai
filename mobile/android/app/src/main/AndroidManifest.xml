@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="documind_ai"
+        android:label="DocuMind AI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
