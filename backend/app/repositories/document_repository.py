@@ -141,3 +141,14 @@ async def delete_document_for_user(
         )
     )
     return int(result.rowcount or 0)
+
+
+async def list_document_ids_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+) -> list[UUID]:
+    result = await session.execute(
+        select(Document.id).where(Document.user_id == user_id).order_by(Document.id)
+    )
+    return list(result.scalars().all())
