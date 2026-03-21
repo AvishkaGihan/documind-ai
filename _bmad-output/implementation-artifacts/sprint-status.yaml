@@ -49,12 +49,13 @@ development_status:
   1-4-set-up-database-models-and-alembic-migrations: done
   1-5-configure-cicd-pipeline-with-github-actions: done
   epic-1-retrospective: done
-  epic-2: done
+  epic-2: in-progress
   2-1-user-registration-api-endpoint: done
   2-2-user-login-api-endpoint: done
   2-3-jwt-authentication-middleware-and-logout: done
   2-4-password-reset-via-email: done
   2-5-flutter-authentication-screens-and-token-management: done
+  2-6-auth-screens-visual-polish-and-branding: backlog
   epic-2-retrospective: done
   epic-3: done
   3-1-pdf-upload-api-and-cloud-storage: done
@@ -83,3 +84,9 @@ development_status:
   6-4-comprehensive-error-handling-and-system-feedback: done
   6-5-accessibility-compliance-and-screen-reader-support: done
   epic-6-retrospective: done
+  epic-7: backlog
+  7-1-settings-screen-ui-and-theme-toggle: backlog
+  7-2-password-reset-ui-flow: backlog
+  7-3-account-deletion-backend-endpoint: backlog
+  7-4-delete-account-ui-and-flow: backlog
+  epic-7-retrospective: backlog

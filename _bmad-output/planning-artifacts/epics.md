@@ -186,6 +186,10 @@ Users can ask natural-language questions about their documents and receive strea
 The app delivers a polished, accessible mobile experience with responsive layouts, offline capabilities, comprehensive error handling, loading states, and full WCAG 2.1 AA accessibility compliance.
 **FRs covered:** FR27, FR28, FR29, FR30, FR31, FR32, FR33
 
+### Epic 7: User Settings & Profile Management [NEW]
+Users can manage their account, toggle application themes, and delete their data securely from a dedicated settings screen.
+**FRs covered:** FR3, FR4 (UI), NFR10
+
 ---
 
 ## Epic 1: Project Foundation & Design System Setup
@@ -393,6 +397,20 @@ So that I can authenticate and stay logged in across app restarts.
 **And** form fields show real-time inline validation (email format, password length ≥12)
 **And** error messages appear below the relevant field, not as alerts
 **And** all touch targets meet the 44×44pt minimum requirement
+
+### Story 2.6: Auth Screens Visual Polish & Branding [NEW]
+
+As a mobile user,
+I want to see beautiful, branded login and signup screens with rich aesthetics,
+So that my first impression of the app is premium and trustworthy.
+
+**Acceptance Criteria:**
+- **Given** I am on the Login or Signup screen
+- **When** I view the background and form
+- **Then** I see the DocuMind AI Logo/Branding element at the top
+- **And** the background uses a subtle glassmorphic effect or gradient aligned with the "Hybrid Premium" theme
+- **And** input fields use custom borders and focus rings matching the accent color
+- **And** login buttons use the full-width Primary style with rich hover/press states
 
 ---
 
@@ -872,3 +890,62 @@ So that I can use DocuMind AI regardless of my abilities.
 **And** all text/background color combinations meet WCAG 2.1 AA contrast ratio (4.5:1 for normal text, 3:1 for large text)
 **And** all touch targets are at minimum 44×44pt
 **And** icon-only buttons have tooltips on long-press
+
+---
+
+## Epic 7: User Settings & Profile Management [NEW]
+
+Users can manage their account, toggle application themes, and delete their data securely from a dedicated settings screen.
+
+### Story 7.1: Settings Screen UI & Theme Toggle
+
+As a user,
+I want a dedicated Settings screen to view my account info and customize app appearance,
+So that I can manage my preferences.
+
+**Acceptance Criteria:**
+- **Given** I am on the Settings tab
+- **When** the screen loads
+- **Then** I see my account email displayed at the top
+- **And** I see options for: "Theme" (Dark/Light toggle), "Reset Password", "Delete Account", and "Logout"
+- **And** toggling the Theme instantly updates the app appearance (rebuilding with light/dark theme)
+- **And** the UI consumes design tokens and is fully polished
+
+### Story 7.2: Password Reset UI Flow
+
+As a user,
+I want to trigger a password reset from the settings screen,
+So that I can secure my account if needed.
+
+**Acceptance Criteria:**
+- **Given** I am on the Settings screen
+- **When** I tap "Reset Password"
+- **Then** I am shown a confirmation dialog stating an email will be sent
+- **And** tapping "Confirm" calls the `/api/v1/user/reset-password` endpoint
+- **And** a success SnackBar confirms the action
+
+### Story 7.3: Account Deletion Backend Endpoint [NEW BACKEND]
+
+As a user,
+I want to delete my account and all my data from the system,
+So that I have full control over my data privacy (NFR10).
+
+**Acceptance Criteria:**
+- **Given** I am an authenticated user
+- **When** I send a DELETE request to `/api/v1/user/me`
+- **Then** the user record is deleted
+- **And** ALL associated documents, vectors in ChromaDB, and conversations are cascade-deleted
+- **And** 204 No Content is returned
+
+### Story 7.4: Delete Account UI & Flow
+
+As a user,
+I want to be able to delete my account from the mobile app,
+So that I can remove my data completely.
+
+**Acceptance Criteria:**
+- **Given** I am on the Settings screen
+- **When** I tap "Delete Account"
+- **Then** a high-warning red Dialog appears asking for confirmation
+- **And** after confirming, the backend is called to delete the account
+- **And** upon success, I am logged out and returned to the Login screen with a confirmation message
