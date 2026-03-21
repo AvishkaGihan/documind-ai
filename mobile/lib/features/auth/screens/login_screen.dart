@@ -1,6 +1,7 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/auth/data/auth_api.dart';
+import 'package:documind_ai/features/auth/providers/auth_flash_message_provider.dart';
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
 import 'package:documind_ai/features/auth/widgets/auth_branded_scaffold.dart';
 import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
@@ -22,6 +23,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _emailError;
   String? _passwordError;
   String? _formError;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showAuthFlashMessageIfPresent();
+    });
+  }
+
+  void _showAuthFlashMessageIfPresent() {
+    if (!mounted) {
+      return;
+    }
+
+    final message = ref.read(authFlashMessageProvider);
+    if (message == null || message.isEmpty) {
+      return;
+    }
+
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: tokens.colors.accentSecondary,
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
+        ),
+      );
+
+    ref.read(authFlashMessageProvider.notifier).clear();
+  }
 
   @override
   void dispose() {

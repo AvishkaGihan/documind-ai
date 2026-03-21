@@ -1,7 +1,9 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/auth/data/auth_api.dart';
+import 'package:documind_ai/features/auth/providers/auth_flash_message_provider.dart';
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
+import 'package:documind_ai/features/settings/data/user_api.dart';
 import 'package:documind_ai/features/settings/providers/theme_mode_provider.dart';
 import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
@@ -91,9 +93,15 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsActionRow(
             label: 'Delete Account',
             icon: Icons.delete_outline,
-            semanticsLabel: 'Delete account option unavailable in this version',
-            enabled: false,
-            onTap: null,
+            semanticsLabel: 'Delete account',
+            enabled: true,
+            onTap: () {
+              _showDeleteAccountDialog(
+                context: context,
+                ref: ref,
+                tokens: tokens,
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.sm),
           _SettingsActionRow(
@@ -272,6 +280,114 @@ class SettingsScreen extends ConsumerWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showDeleteAccountDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required DocuMindTokens tokens,
+  }) async {
+    var isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submitDeletion() async {
+              setDialogState(() {
+                isSubmitting = true;
+              });
+
+              try {
+                await ref.read(userApiProvider).deleteMe();
+
+                if (!dialogContext.mounted || !context.mounted) {
+                  return;
+                }
+
+                ref
+                    .read(authFlashMessageProvider.notifier)
+                    .setMessage('Your account has been deleted.');
+                Navigator.of(dialogContext).pop();
+                await ref.read(authStateProvider.notifier).logout();
+              } on UserApiError catch (error) {
+                if (!dialogContext.mounted || !context.mounted) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop();
+                showPersistentErrorSnackBar(context, tokens, error.message);
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    isSubmitting = false;
+                  });
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: tokens.colors.accentError,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Delete Account',
+                    style: Theme.of(dialogContext).textTheme.titleLarge
+                        ?.copyWith(color: tokens.colors.accentError),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'This will permanently delete your account. Documents, embeddings, and conversations will also be deleted. This action cannot be undone.',
+              ),
+              actions: [
+                Semantics(
+                  button: true,
+                  enabled: !isSubmitting,
+                  label: 'Cancel account deletion',
+                  child: TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(80, 44),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                Semantics(
+                  button: true,
+                  enabled: !isSubmitting,
+                  label: 'Confirm account deletion',
+                  child: FilledButton(
+                    onPressed: isSubmitting ? null : submitDeletion,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(90, 44),
+                      backgroundColor: tokens.colors.accentError,
+                      foregroundColor: tokens.colors.textOnAccent,
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Delete'),
+                  ),
                 ),
               ],
             );

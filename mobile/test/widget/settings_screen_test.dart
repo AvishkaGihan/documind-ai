@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:documind_ai/core/theme/app_theme.dart';
 import 'package:documind_ai/features/auth/data/auth_api.dart';
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
+import 'package:documind_ai/features/settings/data/user_api.dart';
 import 'package:documind_ai/features/settings/providers/theme_mode_provider.dart';
 import 'package:documind_ai/router.dart';
 import 'package:flutter/material.dart';
@@ -156,13 +157,110 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('tapping Delete Account opens destructive dialog', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_buildApp());
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await pumpFrames(tester, 4);
+
+    expect(find.text('Delete Account'), findsWidgets);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(
+      find.textContaining('This action cannot be undone.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('confirming delete calls UserApi.deleteMe', (
+    WidgetTester tester,
+  ) async {
+    var deleteCalled = false;
+    final fakeUserApi = _FakeUserApi(
+      onDelete: () {
+        deleteCalled = true;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [userApiProvider.overrideWithValue(fakeUserApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester, 8);
+
+    expect(deleteCalled, isTrue);
+  });
+
+  testWidgets('successful delete logs out and shows confirmation on Login', (
+    WidgetTester tester,
+  ) async {
+    _TestAuthNotifier.logoutCalls = 0;
+    final fakeUserApi = _FakeUserApi();
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [userApiProvider.overrideWithValue(fakeUserApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester, 12);
+
+    expect(_TestAuthNotifier.logoutCalls, 1);
+    expect(find.byKey(const Key('login-submit-button')), findsOneWidget);
+    expect(find.text('Your account has been deleted.'), findsOneWidget);
+  });
+
+  testWidgets('failed delete shows error and does not logout', (
+    WidgetTester tester,
+  ) async {
+    _TestAuthNotifier.logoutCalls = 0;
+    final fakeUserApi = _FakeUserApi(
+      throwError: const UserApiError(
+        code: 'NETWORK_ERROR',
+        message: 'Unable to reach the server. Please try again.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [userApiProvider.overrideWithValue(fakeUserApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester, 8);
+
+    expect(_TestAuthNotifier.logoutCalls, 0);
+    expect(
+      find.text('Unable to reach the server. Please try again.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('settings-action-delete-account')),
+      findsOneWidget,
+    );
+  });
 }
 
 Widget _buildApp({List overrides = const []}) {
   return ProviderScope(
     overrides: [
       initialLocationProvider.overrideWithValue('/settings'),
-      authStateProvider.overrideWith(_AuthenticatedAuthNotifier.new),
+      authStateProvider.overrideWith(_TestAuthNotifier.new),
       ...overrides,
     ],
     child: Consumer(
@@ -184,10 +282,18 @@ Widget _buildApp({List overrides = const []}) {
   );
 }
 
-class _AuthenticatedAuthNotifier extends AuthNotifier {
+class _TestAuthNotifier extends AuthNotifier {
+  static int logoutCalls = 0;
+
   @override
   FutureOr<AuthState> build() =>
       const AuthState.authenticated(email: 'user@example.com');
+
+  @override
+  Future<void> logout() async {
+    logoutCalls += 1;
+    state = const AsyncData(AuthState.unauthenticated());
+  }
 }
 
 class _FakeAuthApi extends AuthApi {
@@ -199,6 +305,21 @@ class _FakeAuthApi extends AuthApi {
   @override
   Future<void> resetPassword({required String email}) async {
     onReset?.call(email);
+    if (throwError case final error?) {
+      throw error;
+    }
+  }
+}
+
+class _FakeUserApi extends UserApi {
+  _FakeUserApi({this.onDelete, this.throwError}) : super(Dio());
+
+  final VoidCallback? onDelete;
+  final UserApiError? throwError;
+
+  @override
+  Future<void> deleteMe() async {
+    onDelete?.call();
     if (throwError case final error?) {
       throw error;
     }
