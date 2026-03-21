@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-21T14:51:54+05:30"
+last_updated: "2026-03-21T16:07:52+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -76,10 +76,10 @@ development_status:
   5-4-flutter-chat-screen-with-streaming-answers: done
   5-5-conversation-management-and-document-switching: done
   epic-5-retrospective: done
-  epic-6: in-progress
+  epic-6: done
   6-1-responsive-mobile-chat-and-library-layout: done
   6-2-offline-caching-and-upload-queuing: done
   6-3-loading-states-and-processing-feedback: done
   6-4-comprehensive-error-handling-and-system-feedback: done
   6-5-accessibility-compliance-and-screen-reader-support: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
