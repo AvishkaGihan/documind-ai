@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.models.message import Message
 from app.schemas.qa import AskQuestionResponse, CitationPublic
-from app.services.llm_service import LlmService, LlmServiceError
+from app.services.llm_service import LlmRateLimitError, LlmService, LlmServiceError
 from app.services.processing.embedder import Embedder, EmbeddingError
 from app.services.vector_service import (
     DEFAULT_SIMILARITY_THRESHOLD,
@@ -18,7 +18,8 @@ from app.services.vector_service import (
 DEFAULT_TOP_K = 5
 MAX_CITATION_TEXT_LENGTH = 280
 FALLBACK_NO_RELEVANT_INFO = (
-    "I couldn't find relevant information for this question in the document."
+    "I couldn't find relevant information for this question in the document. "
+    "Try rephrasing your question or asking about a different topic."
 )
 
 SYSTEM_PROMPT = (
@@ -32,6 +33,14 @@ SYSTEM_PROMPT = (
 
 class RagServiceError(Exception):
     """Raised when RAG orchestration fails."""
+
+
+class RagServiceRateLimitError(Exception):
+    """Raised when the underlying LLM provider is rate limited."""
+
+    def __init__(self, *, retry_after_seconds: int | None = None) -> None:
+        super().__init__("LLM provider rate limit reached")
+        self.retry_after_seconds = retry_after_seconds
 
 
 class RagService:
@@ -85,6 +94,10 @@ class RagService:
             )
             citations = self._build_citations(relevant_chunks)
             return AskQuestionResponse(answer=answer, citations=citations)
+        except LlmRateLimitError as exc:
+            raise RagServiceRateLimitError(
+                retry_after_seconds=exc.retry_after_seconds
+            ) from exc
         except (EmbeddingError, VectorServiceError, LlmServiceError) as exc:
             raise RagServiceError("Failed to generate RAG answer") from exc
 
@@ -142,6 +155,10 @@ class RagService:
                         continue
                     emitted_pages.add(page)
                     yield "citation", {"page": page, "text": excerpt}
+        except LlmRateLimitError as exc:
+            raise RagServiceRateLimitError(
+                retry_after_seconds=exc.retry_after_seconds
+            ) from exc
         except LlmServiceError:
             yield "error", {
                 "code": "LLM_UNAVAILABLE",

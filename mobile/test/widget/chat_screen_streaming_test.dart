@@ -146,6 +146,57 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('chat handles 429 with warning snackbar and cooldown disable', (
+    WidgetTester tester,
+  ) async {
+    final api = _RateLimitedChatApi();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
+          home: const ChatScreen(documentId: 'doc-5'),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.enterText(
+      find.byKey(const Key('chat-input-text-field')),
+      'Trigger rate limit',
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tap(find.byKey(const Key('chat-send-button')));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      find.text("You've reached the query limit. Please wait 2 seconds."),
+      findsOneWidget,
+    );
+
+    final disabledField = tester.widget<TextField>(
+      find.byKey(const Key('chat-input-text-field')),
+    );
+    expect(disabledField.enabled, isFalse);
+
+    await tester.pump(const Duration(seconds: 3));
+
+    final enabledField = tester.widget<TextField>(
+      find.byKey(const Key('chat-input-text-field')),
+    );
+    expect(enabledField.enabled, isTrue);
+  });
 }
 
 class _FakeChatApi extends ChatApi {
@@ -173,6 +224,31 @@ class _FakeChatApi extends ChatApi {
     );
     await Future<void>.delayed(const Duration(milliseconds: 40));
     yield const ChatSseEvent.done('message-id-1');
+  }
+}
+
+class _RateLimitedChatApi extends ChatApi {
+  _RateLimitedChatApi() : super(Dio(), DocumentsApi(Dio()));
+
+  @override
+  Future<DocumentChatBootstrap> bootstrap(String documentId) async {
+    return const DocumentChatBootstrap(
+      documentTitle: 'Policy Handbook',
+      documentStatus: 'ready',
+      messages: <ChatMessage>[],
+    );
+  }
+
+  @override
+  Stream<ChatSseEvent> streamAsk({
+    required String documentId,
+    required String question,
+  }) async* {
+    throw const ChatApiError(
+      code: 'RATE_LIMITED',
+      message: "You've reached the query limit. Please wait 2 seconds.",
+      retryAfterSeconds: 2,
+    );
   }
 }
 

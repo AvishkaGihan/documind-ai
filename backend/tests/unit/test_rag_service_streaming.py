@@ -128,4 +128,14 @@ def test_streaming_emits_fallback_token_when_no_relevant_chunks() -> None:
 
     events = asyncio.run(_collect_events(rag_service, question="No support"))
 
-    assert events == [("token", {"content": FALLBACK_NO_RELEVANT_INFO})]
+    assert events == [
+        (
+            "token",
+            {
+                "content": (
+                    "I couldn't find relevant information for this question in the document. "
+                    "Try rephrasing your question or asking about a different topic."
+                )
+            },
+        )
+    ]

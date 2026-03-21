@@ -123,7 +123,11 @@ def test_rag_service_returns_fallback_when_no_chunk_meets_threshold() -> None:
             document_id=uuid4(),
             question="Question with no support",
         )
-        assert response.answer == FALLBACK_NO_RELEVANT_INFO
+        assert (
+            response.answer
+            == "I couldn't find relevant information for this question in the document. "
+            "Try rephrasing your question or asking about a different topic."
+        )
         assert response.citations == []
 
     asyncio.run(_run())

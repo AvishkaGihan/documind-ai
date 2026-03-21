@@ -8,6 +8,7 @@ import 'package:documind_ai/features/chat/widgets/ai_typing_indicator.dart';
 import 'package:documind_ai/features/chat/widgets/chat_input_bar.dart';
 import 'package:documind_ai/features/chat/widgets/user_question_bubble.dart';
 import 'package:documind_ai/features/library/providers/document_list_provider.dart';
+import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,15 +81,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       if (next.errorMessage != null &&
           next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.errorMessage!),
-              backgroundColor: tokens.colors.accentError,
-              duration: const Duration(days: 1),
-            ),
-          );
+        showPersistentErrorSnackBar(
+          context,
+          tokens,
+          next.errorMessage!,
+          onRetry: next.lastFailedQuestion == null
+              ? null
+              : () {
+                  ref
+                      .read(chatControllerProvider.notifier)
+                      .retryLastFailedSend();
+                },
+        );
+      }
+
+      if (next.warningMessage != null &&
+          next.warningMessage != previous?.warningMessage) {
+        showWarningSnackBar(context, tokens, next.warningMessage!);
       }
 
       if (previous != null) {
@@ -230,6 +239,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ref.read(chatControllerProvider.notifier).send(question);
           },
           isSending: chatState.isStreaming,
+          enabled: !chatState.isRateLimited,
         ),
       ],
     );

@@ -7,6 +7,7 @@ import 'package:documind_ai/features/library/providers/document_list_provider.da
 import 'package:documind_ai/features/library/providers/document_upload_controller.dart';
 import 'package:documind_ai/features/library/widgets/document_card.dart';
 import 'package:documind_ai/features/library/widgets/document_upload_card.dart';
+import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -83,24 +84,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           next.phase == UploadCardPhase.failed &&
           previous?.phase != UploadCardPhase.failed;
       if (justFailed && next.error != null) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.error!.message),
-              backgroundColor: tokens.colors.accentError,
-              duration: const Duration(days: 1),
-              action: SnackBarAction(
-                label: 'Retry',
-                textColor: tokens.colors.textOnAccent,
-                onPressed: () {
-                  ref
-                      .read(documentUploadControllerProvider.notifier)
-                      .retryUpload();
-                },
-              ),
-            ),
-          );
+        showPersistentErrorSnackBar(
+          context,
+          tokens,
+          next.error!.message,
+          onRetry: () {
+            ref.read(documentUploadControllerProvider.notifier).retryUpload();
+          },
+        );
+      }
+
+      final justProcessingFailed =
+          next.phase == UploadCardPhase.processingError &&
+          previous?.phase != UploadCardPhase.processingError;
+      if (justProcessingFailed) {
+        showPersistentErrorSnackBar(
+          context,
+          tokens,
+          _userFriendlyProcessingError(next.uploadedDocument?.errorMessage),
+          onRetry: () {
+            ref.read(documentUploadControllerProvider.notifier).retryUpload();
+          },
+        );
       }
     });
 
@@ -464,6 +469,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       },
     );
   }
+}
+
+String _userFriendlyProcessingError(String? backendMessage) {
+  const fallback =
+      'We could not process this file. Please upload a valid PDF and try again.';
+  if (backendMessage == null || backendMessage.trim().isEmpty) {
+    return fallback;
+  }
+
+  final normalized = backendMessage.toLowerCase();
+  if (normalized.contains('failed to extract text from pdf') ||
+      normalized.contains('extract text') ||
+      normalized.contains('corrupt')) {
+    return "This file isn't a valid PDF. Please upload a PDF file.";
+  }
+
+  return backendMessage;
 }
 
 class _LibraryContent extends StatelessWidget {

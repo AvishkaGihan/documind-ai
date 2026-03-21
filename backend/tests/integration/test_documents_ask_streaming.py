@@ -197,3 +197,51 @@ def test_streaming_ask_emits_error_event_when_llm_unavailable(
             assert len(conversations) == 0
 
     asyncio.run(_assert_not_persisted())
+
+
+def test_streaming_ask_returns_http_429_when_rate_limited(
+    client,
+    test_session_factory,
+    monkeypatch,
+) -> None:
+    from app.routers import documents as documents_router
+    from app.services.rag_service import RagServiceRateLimitError
+
+    class FakeRagService:
+        async def stream_answer_events(
+            self,
+            *,
+            user_id,
+            document_id,
+            question,
+            conversation_history,
+        ):
+            del user_id, document_id, question
+            del conversation_history
+            raise RagServiceRateLimitError(retry_after_seconds=17)
+            yield "token", {"content": "unreachable"}
+
+    monkeypatch.setattr(documents_router, "RagService", FakeRagService)
+
+    headers, user_id = _auth_headers(client, "ask-streaming-ratelimit@example.com")
+    document_id = _create_document_for_user(
+        test_session_factory=test_session_factory,
+        user_id=user_id,
+        status=DocumentStatus.READY,
+    )
+
+    response = client.post(
+        f"/api/v1/documents/{document_id}/ask",
+        headers={**headers, "Accept": "text/event-stream"},
+        json={"question": "Will this be rate limited?"},
+    )
+
+    assert response.status_code == 429
+    assert response.headers.get("Retry-After") == "17"
+    assert response.json() == {
+        "detail": {
+            "code": "RATE_LIMITED",
+            "message": "You've reached the query limit. Please wait 17 seconds.",
+            "field": None,
+        }
+    }

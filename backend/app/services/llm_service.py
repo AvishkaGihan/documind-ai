@@ -18,6 +18,14 @@ class LlmServiceError(Exception):
     """Raised when generating an LLM answer fails."""
 
 
+class LlmRateLimitError(LlmServiceError):
+    """Raised when the upstream LLM provider responds with rate limiting."""
+
+    def __init__(self, *, retry_after_seconds: int | None = None) -> None:
+        super().__init__("LLM provider rate limit reached")
+        self.retry_after_seconds = retry_after_seconds
+
+
 class LlmService:
     def __init__(
         self,
@@ -61,6 +69,10 @@ class LlmService:
                 with anyio.fail_after(self._timeout_seconds):
                     return await anyio.to_thread.run_sync(self._invoke_sync, messages)
             except Exception as exc:
+                if self._is_rate_limit_error(exc):
+                    raise LlmRateLimitError(
+                        retry_after_seconds=self._extract_retry_after_seconds(exc)
+                    ) from exc
                 last_error = exc
                 logger.warning(
                     "groq_generation_failed",
@@ -109,6 +121,10 @@ class LlmService:
                         await anyio.sleep(0)
                 return
             except Exception as exc:
+                if self._is_rate_limit_error(exc):
+                    raise LlmRateLimitError(
+                        retry_after_seconds=self._extract_retry_after_seconds(exc)
+                    ) from exc
                 last_error = exc
                 logger.warning(
                     "groq_stream_failed",
@@ -153,6 +169,45 @@ class LlmService:
             parts = [item.get("text", "") for item in content if isinstance(item, dict)]
             return "".join(parts)
         return str(content or "")
+
+    @staticmethod
+    def _is_rate_limit_error(error: Exception) -> bool:
+        status_code = getattr(error, "status_code", None)
+        if status_code == 429:
+            return True
+
+        response = getattr(error, "response", None)
+        if response is not None and getattr(response, "status_code", None) == 429:
+            return True
+
+        text = str(error).lower()
+        return "429" in text or "rate limit" in text or "too many requests" in text
+
+    @staticmethod
+    def _extract_retry_after_seconds(error: Exception) -> int | None:
+        candidates: list[Any] = []
+        response = getattr(error, "response", None)
+        if response is not None:
+            headers = getattr(response, "headers", None)
+            if headers is not None:
+                candidates.append(headers.get("retry-after"))
+                candidates.append(headers.get("Retry-After"))
+        headers = getattr(error, "headers", None)
+        if headers is not None:
+            candidates.append(headers.get("retry-after"))
+            candidates.append(headers.get("Retry-After"))
+
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                parsed = int(str(value).strip())
+                if parsed > 0:
+                    return parsed
+            except ValueError:
+                continue
+
+        return None
 
     @staticmethod
     def _build_user_prompt(*, question: str, context_chunks: Sequence[RetrievedChunk]) -> str:

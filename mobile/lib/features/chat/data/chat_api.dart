@@ -9,11 +9,17 @@ import 'package:documind_ai/features/library/models/document_upload_models.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatApiError implements Exception {
-  const ChatApiError({required this.code, required this.message, this.field});
+  const ChatApiError({
+    required this.code,
+    required this.message,
+    this.field,
+    this.retryAfterSeconds,
+  });
 
   final String code;
   final String message;
   final String? field;
+  final int? retryAfterSeconds;
 }
 
 class ChatApi {
@@ -124,6 +130,27 @@ class ChatApi {
   }
 
   ChatApiError _mapError(DioException error) {
+    if (error.response?.statusCode == 429) {
+      final retryAfterSeconds = _parseRetryAfterSeconds(error);
+      final dynamic data = error.response?.data;
+      if (data is Map<String, dynamic>) {
+        final detail = data['detail'];
+        if (detail is Map<String, dynamic>) {
+          return ChatApiError(
+            code: detail['code'] as String? ?? 'RATE_LIMITED',
+            message: detail['message'] as String? ?? 'Too many requests.',
+            field: detail['field'] as String?,
+            retryAfterSeconds: retryAfterSeconds,
+          );
+        }
+      }
+      return ChatApiError(
+        code: 'RATE_LIMITED',
+        message: 'Too many requests.',
+        retryAfterSeconds: retryAfterSeconds,
+      );
+    }
+
     final dynamic data = error.response?.data;
     if (data is Map<String, dynamic>) {
       final detail = data['detail'];
@@ -140,6 +167,31 @@ class ChatApi {
       code: 'NETWORK_ERROR',
       message: 'Unable to reach the server. Please try again.',
     );
+  }
+
+  int? _parseRetryAfterSeconds(DioException error) {
+    final headers = error.response?.headers;
+    final retryAfterRaw = headers?.value('retry-after');
+    if (retryAfterRaw != null) {
+      final parsed = int.tryParse(retryAfterRaw.trim());
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    final resetRaw = headers?.value('x-ratelimit-reset');
+    if (resetRaw != null) {
+      final resetEpochSeconds = int.tryParse(resetRaw.trim());
+      if (resetEpochSeconds != null) {
+        final nowEpochSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+        final remaining = resetEpochSeconds - nowEpochSeconds;
+        if (remaining > 0) {
+          return remaining;
+        }
+      }
+    }
+
+    return null;
   }
 }
 
