@@ -124,6 +124,7 @@ class ChatController extends Notifier<ChatState> {
   static const String _offlineQueuedMessage =
       'Q&A requires an internet connection. Your question will be sent when connectivity restores.';
   static const Duration _queueRetryBackoff = Duration(seconds: 15);
+  static const Duration _announcementThrottle = Duration(milliseconds: 450);
 
   bool _isFlushingQueuedQuestions = false;
   DateTime _nextQueueFlushAt = DateTime.fromMillisecondsSinceEpoch(
@@ -131,6 +132,14 @@ class ChatController extends Notifier<ChatState> {
     isUtc: true,
   );
   Timer? _rateLimitTimer;
+  Timer? _announcementQueueTimer;
+  DateTime _nextAnnouncementAt = DateTime.fromMillisecondsSinceEpoch(
+    0,
+    isUtc: true,
+  );
+  String _announcementBuffer = '';
+  String _lastAnnouncedSentence = '';
+  final List<String> _pendingAnnouncements = <String>[];
 
   @override
   ChatState build() {
@@ -147,6 +156,7 @@ class ChatController extends Notifier<ChatState> {
     });
     ref.onDispose(sub.cancel);
     ref.onDispose(() => _rateLimitTimer?.cancel());
+    ref.onDispose(() => _announcementQueueTimer?.cancel());
 
     return const ChatState();
   }
@@ -171,6 +181,7 @@ class ChatController extends Notifier<ChatState> {
       clearLastFailedQuestion: true,
       clearAnnouncement: true,
     );
+    _resetStreamingAnnouncementState();
 
     if (!isOnline) {
       final cachedMessages = await cache.readChatMessages(
@@ -249,6 +260,7 @@ class ChatController extends Notifier<ChatState> {
       clearLastFailedQuestion: true,
       clearAnnouncement: true,
     );
+    _resetStreamingAnnouncementState();
 
     final api = ref.read(chatApiProvider);
     try {
@@ -454,10 +466,9 @@ class ChatController extends Notifier<ChatState> {
       clearErrorMessage: true,
       clearAnnouncement: true,
     );
+    _resetStreamingAnnouncementState();
 
     final api = ref.read(chatApiProvider);
-    var didAnnounceStart = false;
-
     try {
       await for (final event in api.streamAsk(
         documentId: documentId,
@@ -465,11 +476,9 @@ class ChatController extends Notifier<ChatState> {
       )) {
         switch (event.type) {
           case ChatSseEventType.token:
-            if (!didAnnounceStart) {
-              didAnnounceStart = true;
-              state = state.copyWith(announcement: 'Answer started');
-            }
-            _appendToken(event.content ?? '');
+            final token = event.content ?? '';
+            _appendToken(token);
+            _bufferAnnouncementToken(token);
             break;
           case ChatSseEventType.citation:
             final citation = event.citation;
@@ -479,11 +488,11 @@ class ChatController extends Notifier<ChatState> {
             break;
           case ChatSseEventType.done:
             _completeInFlight(event.messageId ?? '');
+            _flushRemainingAnnouncementText();
             state = state.copyWith(
               isStreaming: false,
               clearInFlightAnswerId: true,
               clearLastFailedQuestion: true,
-              announcement: 'Answer complete',
             );
             if (queueId != null) {
               final namespace = await resolveUserCacheNamespace(ref);
@@ -499,6 +508,7 @@ class ChatController extends Notifier<ChatState> {
             final message = event.errorMessage ?? 'Answer streaming failed.';
             _appendToken('\n\n$message');
             _completeInFlight('');
+            _flushRemainingAnnouncementText();
             state = state.copyWith(
               isStreaming: false,
               clearInFlightAnswerId: true,
@@ -509,6 +519,7 @@ class ChatController extends Notifier<ChatState> {
       }
 
       _completeInFlight('');
+      _flushRemainingAnnouncementText();
       state = state.copyWith(
         isStreaming: false,
         clearInFlightAnswerId: true,
@@ -541,6 +552,7 @@ class ChatController extends Notifier<ChatState> {
           lastFailedQuestion: question,
         );
       }
+      _flushRemainingAnnouncementText();
       if (rethrowOnError) {
         rethrow;
       }
@@ -671,6 +683,157 @@ class ChatController extends Notifier<ChatState> {
           })
           .toList(growable: false),
     );
+  }
+
+  void _bufferAnnouncementToken(String token) {
+    if (token.trim().isEmpty) {
+      return;
+    }
+
+    _announcementBuffer = '$_announcementBuffer$token';
+    _emitCompletedSentencesFromBuffer();
+  }
+
+  void _emitCompletedSentencesFromBuffer() {
+    while (true) {
+      final endIndex = _findSentenceBoundary(_announcementBuffer);
+      if (endIndex < 0) {
+        break;
+      }
+
+      final sentence = _announcementBuffer
+          .substring(0, endIndex + 1)
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      _announcementBuffer = _announcementBuffer.substring(endIndex + 1);
+      _queueAnnouncement(sentence);
+    }
+  }
+
+  int _findSentenceBoundary(String text) {
+    for (var i = 0; i < text.length; i += 1) {
+      final char = text[i];
+      if (char != '.' && char != '!' && char != '?') {
+        continue;
+      }
+
+      if (!_isSentenceBoundary(text, i)) {
+        continue;
+      }
+      return i;
+    }
+    return -1;
+  }
+
+  bool _isSentenceBoundary(String text, int index) {
+    final char = text[index];
+    if (char == '.' && _isLikelyAbbreviation(text, index)) {
+      return false;
+    }
+    if (char == '.' && _isDecimalPoint(text, index)) {
+      return false;
+    }
+    if (char == '.' && _isEllipsis(text, index)) {
+      return false;
+    }
+
+    if (index == text.length - 1) {
+      return true;
+    }
+
+    final nextChar = text[index + 1];
+    return nextChar.trim().isEmpty;
+  }
+
+  bool _isLikelyAbbreviation(String text, int periodIndex) {
+    final sample = text.substring(0, periodIndex + 1);
+    final abbreviationPattern = RegExp(
+      r'\b(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|e\.g|i\.e|u\.s|u\.k)\.$',
+      caseSensitive: false,
+    );
+    return abbreviationPattern.hasMatch(sample.trimRight());
+  }
+
+  bool _isDecimalPoint(String text, int periodIndex) {
+    if (periodIndex <= 0 || periodIndex >= text.length - 1) {
+      return false;
+    }
+    final before = text[periodIndex - 1];
+    final after = text[periodIndex + 1];
+    return int.tryParse(before) != null && int.tryParse(after) != null;
+  }
+
+  bool _isEllipsis(String text, int periodIndex) {
+    final previousIsPeriod = periodIndex > 0 && text[periodIndex - 1] == '.';
+    final nextIsPeriod =
+        periodIndex < text.length - 1 && text[periodIndex + 1] == '.';
+    return previousIsPeriod || nextIsPeriod;
+  }
+
+  void _queueAnnouncement(String sentence) {
+    if (sentence.isEmpty || sentence == _lastAnnouncedSentence) {
+      return;
+    }
+
+    final now = DateTime.now().toUtc();
+    final canAnnounceNow =
+        now.isAfter(_nextAnnouncementAt) ||
+        now.isAtSameMomentAs(_nextAnnouncementAt);
+    if (canAnnounceNow && _pendingAnnouncements.isEmpty) {
+      _emitAnnouncement(sentence);
+      return;
+    }
+
+    if (_pendingAnnouncements.isNotEmpty &&
+        _pendingAnnouncements.last == sentence) {
+      return;
+    }
+    _pendingAnnouncements.add(sentence);
+    _scheduleAnnouncementDrain();
+  }
+
+  void _emitAnnouncement(String sentence) {
+    _lastAnnouncedSentence = sentence;
+    _nextAnnouncementAt = DateTime.now().toUtc().add(_announcementThrottle);
+    state = state.copyWith(announcement: sentence);
+  }
+
+  void _scheduleAnnouncementDrain() {
+    _announcementQueueTimer?.cancel();
+    final now = DateTime.now().toUtc();
+    final delay = now.isBefore(_nextAnnouncementAt)
+        ? _nextAnnouncementAt.difference(now)
+        : Duration.zero;
+
+    _announcementQueueTimer = Timer(delay, () {
+      if (_pendingAnnouncements.isEmpty) {
+        return;
+      }
+      final nextSentence = _pendingAnnouncements.removeAt(0);
+      _emitAnnouncement(nextSentence);
+      if (_pendingAnnouncements.isNotEmpty) {
+        _scheduleAnnouncementDrain();
+      }
+    });
+  }
+
+  void _flushRemainingAnnouncementText() {
+    final remainder = _announcementBuffer
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    _announcementBuffer = '';
+    if (remainder.isNotEmpty) {
+      _queueAnnouncement(remainder);
+    }
+  }
+
+  void _resetStreamingAnnouncementState() {
+    _announcementQueueTimer?.cancel();
+    _announcementQueueTimer = null;
+    _announcementBuffer = '';
+    _pendingAnnouncements.clear();
+    _lastAnnouncedSentence = '';
+    _nextAnnouncementAt = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 
   void _appendCitation(Citation citation) {

@@ -483,12 +483,16 @@ class _FakeLocalCacheStore implements LocalCacheStore {
 
 class _NoopDocumentListNotifier extends DocumentListNotifier {
   @override
-  Future<DocumentListResponse> build() async {
-    return const DocumentListResponse(
-      items: <UploadedDocument>[],
-      total: 0,
-      page: 1,
-      pageSize: 100,
+  DocumentListState build() {
+    return const DocumentListState(
+      documents: AsyncValue<DocumentListResponse>.data(
+        DocumentListResponse(
+          items: <UploadedDocument>[],
+          total: 0,
+          page: 1,
+          pageSize: 100,
+        ),
+      ),
     );
   }
 

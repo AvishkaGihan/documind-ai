@@ -4,18 +4,80 @@ import 'package:documind_ai/features/library/data/documents_api.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class DocumentListNotifier extends AsyncNotifier<DocumentListResponse> {
+class DocumentListState {
+  const DocumentListState({
+    this.documents = const AsyncValue<DocumentListResponse>.loading(),
+    this.announcement,
+  });
+
+  final AsyncValue<DocumentListResponse> documents;
+  final String? announcement;
+
+  DocumentListState copyWith({
+    AsyncValue<DocumentListResponse>? documents,
+    String? announcement,
+    bool clearAnnouncement = false,
+  }) {
+    return DocumentListState(
+      documents: documents ?? this.documents,
+      announcement: clearAnnouncement
+          ? null
+          : (announcement ?? this.announcement),
+    );
+  }
+}
+
+class DocumentListNotifier extends Notifier<DocumentListState> {
   static const int _defaultPage = 1;
   static const int _defaultPageSize = 100;
+  Map<String, String> _lastStatusesByDocumentId = const <String, String>{};
 
   @override
-  Future<DocumentListResponse> build() {
-    return _loadDocuments();
+  DocumentListState build() {
+    Future.microtask(_loadInitial);
+    return const DocumentListState();
+  }
+
+  Future<void> _loadInitial() async {
+    final loaded = await AsyncValue.guard(_loadDocuments);
+    if (!ref.mounted) {
+      return;
+    }
+    state = state.copyWith(documents: loaded, clearAnnouncement: true);
+    _updateStatusSnapshotFromCurrentState();
   }
 
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadDocuments);
+    final previousStatuses = _lastStatusesByDocumentId;
+    state = state.copyWith(
+      documents: const AsyncValue<DocumentListResponse>.loading(),
+      clearAnnouncement: true,
+    );
+
+    final nextDocuments = await AsyncValue.guard(_loadDocuments);
+    if (!ref.mounted) {
+      return;
+    }
+    final nextStatuses = nextDocuments.maybeWhen(
+      data: _indexStatuses,
+      orElse: () => previousStatuses,
+    );
+
+    final announcement = _buildTransitionAnnouncement(
+      previousStatuses,
+      nextStatuses,
+      nextDocuments,
+    );
+
+    state = state.copyWith(
+      documents: nextDocuments,
+      announcement: announcement,
+    );
+    _updateStatusSnapshotFromCurrentState();
+  }
+
+  void clearAnnouncement() {
+    state = state.copyWith(clearAnnouncement: true);
   }
 
   Future<DocumentListResponse> _loadDocuments() async {
@@ -58,9 +120,47 @@ class DocumentListNotifier extends AsyncNotifier<DocumentListResponse> {
         lowered == 'CONNECTION_ERROR' ||
         lowered == 'TIMEOUT';
   }
+
+  Map<String, String> _indexStatuses(DocumentListResponse response) {
+    return <String, String>{
+      for (final doc in response.items) doc.id: doc.status,
+    };
+  }
+
+  String? _buildTransitionAnnouncement(
+    Map<String, String> previousStatuses,
+    Map<String, String> nextStatuses,
+    AsyncValue<DocumentListResponse> nextDocuments,
+  ) {
+    return nextDocuments.maybeWhen(
+      data: (response) {
+        for (final document in response.items) {
+          final previous = previousStatuses[document.id];
+          final next = nextStatuses[document.id];
+          if (previous == null || previous == next || next == null) {
+            continue;
+          }
+          if (next == 'ready') {
+            return 'Document ${document.title} is now ready';
+          }
+          if (next == 'error') {
+            return 'Document ${document.title} processing failed';
+          }
+        }
+        return null;
+      },
+      orElse: () => null,
+    );
+  }
+
+  void _updateStatusSnapshotFromCurrentState() {
+    state.documents.whenData((response) {
+      _lastStatusesByDocumentId = _indexStatuses(response);
+    });
+  }
 }
 
 final documentListProvider =
-    AsyncNotifierProvider<DocumentListNotifier, DocumentListResponse>(
+    NotifierProvider<DocumentListNotifier, DocumentListState>(
       DocumentListNotifier.new,
     );

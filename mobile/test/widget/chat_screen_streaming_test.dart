@@ -65,6 +65,54 @@ void main() {
     expect(find.byKey(const Key('ai-typing-indicator')), findsNothing);
   });
 
+  testWidgets('chat exposes citation semantics copy and key tooltips', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeChatApi();
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
+          home: const ChatScreen(documentId: 'doc-5'),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(find.byTooltip('New conversation'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('chat-input-text-field')),
+      'What is inside?',
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tap(find.byKey(const Key('chat-send-button')));
+    await tester.pump(const Duration(milliseconds: 220));
+
+    final semanticsWidgets = tester.widgetList<Semantics>(
+      find.byType(Semantics),
+    );
+    final hasCitationSemantics = semanticsWidgets.any((semantics) {
+      final label = semantics.properties.label;
+      return label != null &&
+          label.startsWith('Page reference, page 4. Tap to view source.');
+    });
+    expect(hasCitationSemantics, isTrue);
+    semantics.dispose();
+  });
+
   testWidgets('chat shows offline queued message when send tapped offline', (
     WidgetTester tester,
   ) async {
@@ -196,6 +244,38 @@ void main() {
       find.byKey(const Key('chat-input-text-field')),
     );
     expect(enabledField.enabled, isTrue);
+  });
+
+  testWidgets('chat layout remains stable at 200% text scaling', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeChatApi();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme.copyWith(
+            splashFactory: InkRipple.splashFactory,
+          ),
+          home: const MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(2.0)),
+            child: SizedBox(width: 320, child: ChatScreen(documentId: 'doc-5')),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('chat-input-bar')), findsOneWidget);
   });
 }
 

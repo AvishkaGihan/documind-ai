@@ -1,6 +1,7 @@
 import 'package:documind_ai/core/theme/app_theme.dart';
 import 'package:documind_ai/features/chat/widgets/chat_input_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -77,5 +78,63 @@ void main() {
       find.byKey(const Key('chat-send-button')),
     );
     expect(sendButton.onPressed, isNull);
+  });
+
+  testWidgets('send button exposes required semantics label', (
+    WidgetTester tester,
+  ) async {
+    final controller = TextEditingController(text: 'Question');
+
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: ChatInputBar(
+            controller: controller,
+            onChanged: (_) {},
+            onSend: () {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+
+    expect(find.bySemanticsLabel('Send question'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('keyboard tab traversal keeps send control focusable', (
+    WidgetTester tester,
+  ) async {
+    final controller = TextEditingController(text: 'Question');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: FocusTraversalGroup(
+            child: ChatInputBar(
+              controller: controller,
+              onChanged: (_) {},
+              onSend: () {},
+              isSending: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump(const Duration(milliseconds: 160));
+
+    expect(find.byKey(const Key('chat-send-focus-ring')), findsOneWidget);
+    expect(find.byKey(const Key('chat-send-button')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

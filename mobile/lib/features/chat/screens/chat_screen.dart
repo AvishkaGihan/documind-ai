@@ -8,6 +8,7 @@ import 'package:documind_ai/features/chat/widgets/ai_typing_indicator.dart';
 import 'package:documind_ai/features/chat/widgets/chat_input_bar.dart';
 import 'package:documind_ai/features/chat/widgets/user_question_bubble.dart';
 import 'package:documind_ai/features/library/providers/document_list_provider.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -135,44 +136,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         centerTitle: false,
-        title: InkWell(
-          key: const Key('chat-document-selector-button'),
-          onTap: _openDocumentSelector,
-          borderRadius: BorderRadius.circular(AppSpacing.sm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs,
-              vertical: AppSpacing.xs,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
-                const SizedBox(width: AppSpacing.xs),
-                const Icon(Icons.keyboard_arrow_down_rounded),
-              ],
+        title: AccessibilityFocusRing(
+          borderRadius: AppSpacing.sm,
+          child: Semantics(
+            button: true,
+            label: 'Select active document. $title',
+            child: InkWell(
+              key: const Key('chat-document-selector-button'),
+              onTap: _openDocumentSelector,
+              borderRadius: BorderRadius.circular(AppSpacing.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(title, overflow: TextOverflow.ellipsis),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    const ExcludeSemantics(
+                      child: Icon(Icons.keyboard_arrow_down_rounded),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
         actions: [
-          IconButton(
-            key: const Key('chat-new-conversation-button'),
-            tooltip: 'New Conversation',
-            onPressed: _confirmNewConversation,
-            icon: const Icon(Icons.add_comment_outlined),
-          ),
-          PopupMenuButton<_ChatAction>(
-            key: const Key('chat-overflow-menu'),
-            onSelected: (action) async {
-              await _openConversationHistory();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<_ChatAction>(
-                value: _ChatAction.conversationHistory,
-                key: Key('chat-menu-conversation-history'),
-                child: Text('Conversation history'),
+          AccessibilityFocusRing(
+            borderRadius: 22,
+            child: IconButton(
+              key: const Key('chat-new-conversation-button'),
+              tooltip: 'New conversation',
+              onPressed: _confirmNewConversation,
+              icon: const ExcludeSemantics(
+                child: Icon(Icons.add_comment_outlined),
               ),
-            ],
+            ),
+          ),
+          AccessibilityFocusRing(
+            borderRadius: 22,
+            child: PopupMenuButton<_ChatAction>(
+              key: const Key('chat-overflow-menu'),
+              tooltip: 'Chat options',
+              onSelected: (action) async {
+                await _openConversationHistory();
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<_ChatAction>(
+                  value: _ChatAction.conversationHistory,
+                  key: Key('chat-menu-conversation-history'),
+                  child: Text('Conversation history'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -266,7 +287,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: Consumer(
               builder: (context, ref, child) {
-                final documentsAsync = ref.watch(documentListProvider);
+                final documentsAsync = ref
+                    .watch(documentListProvider)
+                    .documents;
                 return documentsAsync.when(
                   data: (response) {
                     final readyDocuments = response.items
@@ -339,7 +362,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       builder: (sheetContext) {
         return Consumer(
           builder: (context, ref, child) {
-            final documentsAsync = ref.watch(documentListProvider);
+            final documentsAsync = ref.watch(documentListProvider).documents;
             return documentsAsync.when(
               data: (response) {
                 final readyDocuments = response.items

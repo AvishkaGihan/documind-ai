@@ -43,6 +43,47 @@ void main() {
     expect(state.messages.single.content, 'Cached question');
     expect(api.bootstrapCallCount, 0);
   });
+
+  test(
+    'streaming emits accessibility announcement for each completed sentence',
+    () async {
+      final connectivity = _FakeConnectivityService(initialOnline: true);
+      final cache = _FakeLocalCacheStore();
+      final api = _FakeChatApi();
+
+      final container = ProviderContainer(
+        overrides: [
+          connectivityServiceProvider.overrideWithValue(connectivity),
+          localCacheStoreProvider.overrideWithValue(cache),
+          chatApiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(chatControllerProvider.notifier).load('doc-2');
+
+      final announcements = <String>[];
+      container.listen<ChatState>(chatControllerProvider, (previous, next) {
+        if (next.announcement != null) {
+          announcements.add(next.announcement!);
+          container.read(chatControllerProvider.notifier).clearAnnouncement();
+        }
+      }, fireImmediately: false);
+
+      await container
+          .read(chatControllerProvider.notifier)
+          .send('What does the document say?');
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+
+      expect(
+        announcements,
+        containsAllInOrder(<String>[
+          'Dr. Rivera reviewed the file.',
+          'The final recommendation is approved!',
+        ]),
+      );
+    },
+  );
 }
 
 class _FakeChatApi extends ChatApi {
@@ -58,6 +99,18 @@ class _FakeChatApi extends ChatApi {
       documentStatus: 'ready',
       messages: <ChatMessage>[],
     );
+  }
+
+  @override
+  Stream<ChatSseEvent> streamAsk({
+    required String documentId,
+    required String question,
+  }) async* {
+    yield const ChatSseEvent.token('Dr. Rivera reviewed the file. ');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    yield const ChatSseEvent.token('The final recommendation is approved!');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    yield const ChatSseEvent.done('server-answer-id');
   }
 }
 

@@ -249,7 +249,7 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
         uploadedDocument: latest,
         clearError: nextPhase != UploadCardPhase.failed,
         announcement: statusChanged
-            ? _announcementForStatus(latest.status)
+            ? _announcementForStatus(latest.status, latest.title)
             : null,
       );
 
@@ -275,20 +275,21 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
     }
   }
 
-  String _announcementForStatus(String status) {
+  String _announcementForStatus(String status, String title) {
+    final safeTitle = title.trim().isEmpty ? 'Document' : 'Document $title';
     switch (status) {
       case 'extracting':
-        return 'Extracting text.';
+        return '$safeTitle is extracting text';
       case 'chunking':
-        return 'Creating knowledge chunks.';
+        return '$safeTitle is creating knowledge chunks';
       case 'embedding':
-        return 'Building intelligence index.';
+        return '$safeTitle is building intelligence index';
       case 'ready':
-        return 'Document is ready to answer your questions.';
+        return '$safeTitle is now ready';
       case 'error':
-        return 'Document processing failed.';
+        return '$safeTitle processing failed';
       default:
-        return 'Document processing in progress.';
+        return '$safeTitle processing in progress';
     }
   }
 }

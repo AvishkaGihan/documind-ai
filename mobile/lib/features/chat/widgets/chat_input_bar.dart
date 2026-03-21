@@ -1,5 +1,6 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:flutter/material.dart';
 
 class ChatInputBar extends StatelessWidget {
@@ -85,23 +86,28 @@ class ChatInputBar extends StatelessWidget {
               Semantics(
                 button: true,
                 enabled: canSend,
-                label: canSend ? 'Send message' : 'Send disabled',
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: IconButton.filled(
-                    key: const Key('chat-send-button'),
-                    onPressed: canSend ? onSend : null,
-                    icon: isSending
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: tokens.colors.textOnAccent,
-                            ),
-                          )
-                        : const Icon(Icons.send),
+                label: canSend ? 'Send question' : 'Send question disabled',
+                child: AccessibilityFocusRing(
+                  key: const Key('chat-send-focus-ring'),
+                  borderRadius: 24,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: IconButton.filled(
+                      key: const Key('chat-send-button'),
+                      tooltip: 'Send question',
+                      onPressed: canSend ? onSend : null,
+                      icon: isSending
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: tokens.colors.textOnAccent,
+                              ),
+                            )
+                          : ExcludeSemantics(child: const Icon(Icons.send)),
+                    ),
                   ),
                 ),
               ),

@@ -9,6 +9,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Future<DocumentListResponse> waitForDocuments(
+    ProviderContainer container,
+  ) async {
+    for (var i = 0; i < 20; i += 1) {
+      final documents = container.read(documentListProvider).documents;
+      if (documents.hasValue) {
+        return documents.requireValue;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    throw StateError('Timed out waiting for document list');
+  }
+
   test('documentListProvider loads documents and refreshes', () async {
     var callCount = 0;
     final fakeApi = _FakeDocumentsApi(
@@ -44,14 +57,14 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final first = await container.read(documentListProvider.future);
+    final first = await waitForDocuments(container);
     expect(callCount, 1);
     expect(first.items.first.id, 'doc-1');
     expect(first.pageSize, 100);
 
     await container.read(documentListProvider.notifier).refresh();
 
-    final second = await container.read(documentListProvider.future);
+    final second = container.read(documentListProvider).documents.requireValue;
     expect(callCount, 2);
     expect(second.items.first.id, 'doc-2');
   });
@@ -95,8 +108,51 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    final response = await container.read(documentListProvider.future);
+    final response = await waitForDocuments(container);
     expect(response.items.single.id, 'cached-doc');
+  });
+
+  test('refresh announces document readiness transitions by title', () async {
+    var callCount = 0;
+    final fakeApi = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        callCount += 1;
+        return DocumentListResponse(
+          items: [
+            UploadedDocument(
+              id: 'doc-announce',
+              title: 'Contract Review',
+              fileSize: 2048,
+              pageCount: 2,
+              status: callCount == 1 ? 'embedding' : 'ready',
+              errorMessage: null,
+              createdAt: DateTime.utc(2026, 3, 19),
+            ),
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 100,
+        );
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        documentsApiProvider.overrideWithValue(fakeApi),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await waitForDocuments(container);
+    await container.read(documentListProvider.notifier).refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+
+    final state = container.read(documentListProvider);
+    expect(state.announcement, 'Document Contract Review is now ready');
   });
 }
 
