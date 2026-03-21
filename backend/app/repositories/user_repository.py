@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -22,3 +22,12 @@ async def create_user(session: AsyncSession, email: str, hashed_password: str) -
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def delete_user_by_id(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+) -> int:
+    result = await session.execute(delete(User).where(User.id == user_id))
+    return int(result.rowcount or 0)
