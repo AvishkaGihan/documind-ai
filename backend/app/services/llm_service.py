@@ -110,15 +110,20 @@ class LlmService:
         for attempt in range(1, attempts + 1):
             emitted_any_token = False
             try:
-                with anyio.fail_after(self._timeout_seconds):
-                    async for chunk in self._get_client().astream(messages):
-                        token = self._chunk_to_text(chunk)
-                        if not token:
-                            continue
-                        emitted_any_token = True
-                        yield token
-                        # Ensure a regular cancellation point for disconnected clients.
-                        await anyio.sleep(0)
+                # NOTE: Do NOT wrap this in anyio.fail_after() – the cancel
+                # scope must be entered and exited in the *same* async task,
+                # but FastAPI's StreamingResponse consumes this generator in a
+                # different task, causing "Attempted to exit cancel scope in a
+                # different task than it was entered in".  The ChatGroq client
+                # already enforces its own timeout via the ``timeout`` param.
+                async for chunk in self._get_client().astream(messages):
+                    token = self._chunk_to_text(chunk)
+                    if not token:
+                        continue
+                    emitted_any_token = True
+                    yield token
+                    # Ensure a regular cancellation point for disconnected clients.
+                    await anyio.sleep(0)
                 return
             except Exception as exc:
                 if self._is_rate_limit_error(exc):
