@@ -7,6 +7,7 @@ import 'package:documind_ai/features/library/providers/document_list_provider.da
 import 'package:documind_ai/features/library/providers/document_upload_controller.dart';
 import 'package:documind_ai/features/library/widgets/document_card.dart';
 import 'package:documind_ai/features/library/widgets/document_upload_card.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
 import 'package:flutter/material.dart';
@@ -60,7 +61,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
     final uploadState = ref.watch(documentUploadControllerProvider);
-    final documentsAsync = ref.watch(documentListProvider);
+    final documentsAsync = ref.watch(documentListProvider).documents;
     final isSearching = _isSearching;
     final searchQuery = _searchQuery;
     final sortMode = _sortMode;
@@ -109,6 +110,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       }
     });
 
+    ref.listen<DocumentListState>(documentListProvider, (previous, next) {
+      final announcement = next.announcement;
+      if (announcement == null || announcement == previous?.announcement) {
+        return;
+      }
+
+      final textDirection = Directionality.of(context);
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        announcement,
+        textDirection,
+      );
+      ref.read(documentListProvider.notifier).clearAnnouncement();
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Document Library'),
@@ -116,40 +132,48 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           Semantics(
             button: true,
             label: isSearching ? 'Close search' : 'Search documents',
-            child: IconButton(
-              key: const Key('library-search-button'),
-              tooltip: isSearching ? 'Close search' : 'Search',
-              onPressed: () {
-                if (isSearching) {
+            child: AccessibilityFocusRing(
+              borderRadius: 22,
+              child: IconButton(
+                key: const Key('library-search-button'),
+                tooltip: isSearching ? 'Close search' : 'Search documents',
+                onPressed: () {
+                  if (isSearching) {
+                    setState(() {
+                      _searchQuery = '';
+                      _isSearching = false;
+                    });
+                    _searchController.clear();
+                    return;
+                  }
                   setState(() {
-                    _searchQuery = '';
-                    _isSearching = false;
+                    _isSearching = true;
                   });
-                  _searchController.clear();
-                  return;
-                }
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-              icon: Icon(isSearching ? Icons.close : Icons.search),
+                },
+                icon: ExcludeSemantics(
+                  child: Icon(isSearching ? Icons.close : Icons.search),
+                ),
+              ),
             ),
           ),
           Semantics(
             button: true,
             label: 'Sort documents',
-            child: IconButton(
-              key: const Key('library-sort-button'),
-              tooltip: 'Sort',
-              onPressed: () async {
-                final selected = await _showSortOptions(context, sortMode);
-                if (selected != null && context.mounted) {
-                  setState(() {
-                    _sortMode = selected;
-                  });
-                }
-              },
-              icon: const Icon(Icons.sort),
+            child: AccessibilityFocusRing(
+              borderRadius: 22,
+              child: IconButton(
+                key: const Key('library-sort-button'),
+                tooltip: 'Sort documents',
+                onPressed: () async {
+                  final selected = await _showSortOptions(context, sortMode);
+                  if (selected != null && context.mounted) {
+                    setState(() {
+                      _sortMode = selected;
+                    });
+                  }
+                },
+                icon: const ExcludeSemantics(child: Icon(Icons.sort)),
+              ),
             ),
           ),
         ],
@@ -158,13 +182,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       floatingActionButton: Semantics(
         button: true,
         label: 'Upload PDF',
-        child: FloatingActionButton(
-          key: const Key('library-upload-fab'),
-          onPressed: () {
-            ref.read(documentUploadControllerProvider.notifier).pickAndUpload();
-          },
-          tooltip: 'Upload PDF',
-          child: const Icon(Icons.add),
+        child: AccessibilityFocusRing(
+          borderRadius: 30,
+          child: FloatingActionButton(
+            key: const Key('library-upload-fab'),
+            onPressed: () {
+              ref
+                  .read(documentUploadControllerProvider.notifier)
+                  .pickAndUpload();
+            },
+            tooltip: 'Upload PDF',
+            child: const ExcludeSemantics(child: Icon(Icons.add)),
+          ),
         ),
       ),
       body: RefreshIndicator(

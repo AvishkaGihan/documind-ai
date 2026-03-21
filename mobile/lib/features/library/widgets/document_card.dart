@@ -4,6 +4,7 @@ import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
 import 'package:documind_ai/features/library/widgets/processing_animation.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:flutter/material.dart';
 
 class DocumentCard extends StatelessWidget {
@@ -49,10 +50,12 @@ class DocumentCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.picture_as_pdf_outlined,
-                      color: tokens.colors.accentPrimary,
-                      size: 28,
+                    ExcludeSemantics(
+                      child: Icon(
+                        Icons.picture_as_pdf_outlined,
+                        color: tokens.colors.accentPrimary,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -108,12 +111,15 @@ class DocumentCard extends StatelessWidget {
       ),
     );
 
-    final interactive = InkWell(
-      key: Key('document-card-${document.id}'),
-      onTap: isReady ? onTap : null,
-      onLongPress: onLongPress,
-      borderRadius: BorderRadius.circular(16),
-      child: card,
+    final interactive = AccessibilityFocusRing(
+      borderRadius: 18,
+      child: InkWell(
+        key: Key('document-card-${document.id}'),
+        onTap: isReady ? onTap : null,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(16),
+        child: card,
+      ),
     );
 
     return interactive;

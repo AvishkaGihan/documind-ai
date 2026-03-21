@@ -481,6 +481,65 @@ void main() {
     expect(find.text('Tablet Doc 1'), findsOneWidget);
     expect(find.text('Tablet Doc 2'), findsOneWidget);
   });
+
+  testWidgets('icon-only actions expose tooltips for long-press discovery', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        return DocumentListResponse(
+          items: [_doc(id: 'doc-1', title: 'Tooltip Doc')],
+          total: 1,
+          page: 1,
+          pageSize: 100,
+        );
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(api));
+    await pumpFrames(tester);
+
+    expect(find.byTooltip('Search documents'), findsOneWidget);
+    expect(find.byTooltip('Sort documents'), findsOneWidget);
+    expect(find.byTooltip('Upload PDF'), findsOneWidget);
+  });
+
+  testWidgets('200% text scale remains usable without layout exceptions', (
+    WidgetTester tester,
+  ) async {
+    _setScreenSize(tester, const Size(320, 800));
+
+    final api = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        return DocumentListResponse(
+          items: [
+            _doc(
+              id: 'doc-scale',
+              title:
+                  'Accessibility document title with enough length to wrap naturally',
+              status: 'ready',
+            ),
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 100,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        api,
+        mediaQueryData: const MediaQueryData(
+          textScaler: TextScaler.linear(2.0),
+        ),
+      ),
+    );
+    await pumpFrames(tester);
+
+    expect(find.byKey(const Key('library-layout-list')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 int apiGetCallCount = 0;

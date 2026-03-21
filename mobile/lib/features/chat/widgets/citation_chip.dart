@@ -1,5 +1,6 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:flutter/material.dart';
 
 class CitationChip extends StatelessWidget {
@@ -27,21 +28,25 @@ class CitationChip extends StatelessWidget {
         Semantics(
           button: true,
           toggled: isExpanded,
-          label: 'Citation page $pageNumber',
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
-            child: ActionChip(
-              key: Key('citation-chip-$pageNumber'),
-              onPressed: onToggle,
-              avatar: const Text('📄'),
-              label: Text('Page $pageNumber'),
-              side: BorderSide(color: tokens.colors.accentCitation),
-              backgroundColor: tokens.colors.accentCitation.withValues(
-                alpha: 0.15,
-              ),
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                color: tokens.colors.accentCitation,
-                fontWeight: FontWeight.w600,
+          label:
+              'Page reference, page $pageNumber. Tap to view source. ${isExpanded ? 'Expanded' : 'Collapsed'}.',
+          child: AccessibilityFocusRing(
+            borderRadius: 24,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: ActionChip(
+                key: Key('citation-chip-$pageNumber'),
+                onPressed: onToggle,
+                avatar: const ExcludeSemantics(child: Text('📄')),
+                label: Text('Page $pageNumber'),
+                side: BorderSide(color: tokens.colors.accentCitation),
+                backgroundColor: tokens.colors.accentCitation.withValues(
+                  alpha: 0.15,
+                ),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: tokens.colors.accentCitation,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
