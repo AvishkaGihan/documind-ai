@@ -1,5 +1,5 @@
 # generated: 2026-03-14T19:43:58+05:30
-# last_updated: "2026-03-21T22:52:35+05:30"
+# last_updated: "2026-03-22T00:16:00+05:30"
 # project: documind-ai
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-21T23:08:44+05:30"
+last_updated: "2026-03-22T00:16:00+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -86,7 +86,7 @@ development_status:
   epic-6-retrospective: done
   epic-7: in-progress
   7-1-settings-screen-ui-and-theme-toggle: done
-  7-2-password-reset-ui-flow: backlog
+  7-2-password-reset-ui-flow: done
   7-3-account-deletion-backend-endpoint: backlog
   7-4-delete-account-ui-and-flow: backlog
   epic-7-retrospective: backlog

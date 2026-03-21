@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:documind_ai/core/theme/app_theme.dart';
+import 'package:documind_ai/features/auth/data/auth_api.dart';
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
 import 'package:documind_ai/features/settings/providers/theme_mode_provider.dart';
 import 'package:documind_ai/router.dart';
@@ -67,13 +69,101 @@ void main() {
     app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
   });
+
+  testWidgets('tapping Reset Password opens confirmation dialog', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_buildApp());
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-reset-password')));
+    await pumpFrames(tester, 4);
+
+    expect(find.text('Reset Password'), findsWidgets);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Confirm'), findsOneWidget);
+  });
+
+  testWidgets('confirming reset calls AuthApi.resetPassword with user email', (
+    WidgetTester tester,
+  ) async {
+    String? capturedEmail;
+    final fakeAuthApi = _FakeAuthApi(
+      onReset: (email) {
+        capturedEmail = email;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [authApiProvider.overrideWithValue(fakeAuthApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-reset-password')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Confirm'));
+    await pumpFrames(tester, 6);
+
+    expect(capturedEmail, 'user@example.com');
+  });
+
+  testWidgets('successful reset shows a success SnackBar', (
+    WidgetTester tester,
+  ) async {
+    final fakeAuthApi = _FakeAuthApi();
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [authApiProvider.overrideWithValue(fakeAuthApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-reset-password')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Confirm'));
+    await pumpFrames(tester, 6);
+
+    expect(
+      find.text('If an account exists, a password reset email has been sent.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('failed reset shows persistent error SnackBar', (
+    WidgetTester tester,
+  ) async {
+    final fakeAuthApi = _FakeAuthApi(
+      throwError: const AuthApiError(
+        code: 'NETWORK_ERROR',
+        message: 'Unable to reach the server. Please try again.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _buildApp(overrides: [authApiProvider.overrideWithValue(fakeAuthApi)]),
+    );
+    await pumpFrames(tester, 8);
+
+    await tester.tap(find.byKey(const Key('settings-action-reset-password')));
+    await pumpFrames(tester, 3);
+
+    await tester.tap(find.text('Confirm'));
+    await pumpFrames(tester, 6);
+
+    expect(
+      find.text('Unable to reach the server. Please try again.'),
+      findsOneWidget,
+    );
+  });
 }
 
-Widget _buildApp() {
+Widget _buildApp({List overrides = const []}) {
   return ProviderScope(
     overrides: [
       initialLocationProvider.overrideWithValue('/settings'),
       authStateProvider.overrideWith(_AuthenticatedAuthNotifier.new),
+      ...overrides,
     ],
     child: Consumer(
       builder: (context, ref, _) {
@@ -98,4 +188,19 @@ class _AuthenticatedAuthNotifier extends AuthNotifier {
   @override
   FutureOr<AuthState> build() =>
       const AuthState.authenticated(email: 'user@example.com');
+}
+
+class _FakeAuthApi extends AuthApi {
+  _FakeAuthApi({this.onReset, this.throwError}) : super(Dio());
+
+  final void Function(String email)? onReset;
+  final AuthApiError? throwError;
+
+  @override
+  Future<void> resetPassword({required String email}) async {
+    onReset?.call(email);
+    if (throwError case final error?) {
+      throw error;
+    }
+  }
 }
