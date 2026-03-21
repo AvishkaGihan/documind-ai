@@ -379,6 +379,10 @@ DocuMind AI combines familiar patterns in a novel way:
 
 ## Visual Design Foundation
 
+### App Branding Assets
+- **Launcher Icon:** A minimalist icon featuring the primary electric blue accent (#58A6FF) against a deep dark background (#0D1117). 
+- **Splash Screen:** #0D1117 solid background with the centered launcher icon to create a seamless transition into the app's dark mode scaffold.
+
 ### Color System
 
 **Brand Identity: "Midnight Intelligence"**

@@ -322,6 +322,7 @@ DocuMind AI is a cross-platform mobile application (Flutter or React Native) wit
 | Conversation memory within sessions | Natural follow-up question support |
 | Multi-document library with status indicators | Essential document management |
 | Clean, polished mobile UI | Portfolio presentation quality |
+| Native App Branding (Icon & Splash) | Professional installation and cold-start experience |
 
 ### Post-MVP Features
 

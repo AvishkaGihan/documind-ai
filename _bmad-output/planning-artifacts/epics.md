@@ -190,6 +190,10 @@ The app delivers a polished, accessible mobile experience with responsive layout
 Users can manage their account, toggle application themes, and delete their data securely from a dedicated settings screen.
 **FRs covered:** FR3, FR4 (UI), NFR10
 
+### Epic 8: App Branding & Release Preparation
+The app delivers a cohesive, premium brand experience outside of the UI by configuring the native launcher icon, app display name, and native splash screen to match the Design System.
+**FRs covered:** Mobile Experience Polish
+
 ---
 
 ## Epic 1: Project Foundation & Design System Setup
@@ -949,3 +953,31 @@ So that I can remove my data completely.
 - **Then** a high-warning red Dialog appears asking for confirmation
 - **And** after confirming, the backend is called to delete the account
 - **And** upon success, I am logged out and returned to the Login screen with a confirmation message
+
+---
+
+## Epic 8: App Branding & Release Preparation
+
+The app delivers a cohesive, premium brand experience outside of the UI by configuring the native launcher icon, app display name, and native splash screen to match the Design System.
+
+### Story 8.1: Configure App Display Name and Launcher Icon
+
+As a user,
+I want to see the correct app name and a branded logo on my home screen,
+So that the app looks professional and easy to identify.
+
+**Acceptance Criteria:**
+- The Android `android:label` and iOS `CFBundleDisplayName` are set to "DocuMind AI".
+- A custom launcher icon is generated using `flutter_launcher_icons`.
+- The icon uses the deep indigo/cyan branding of the project.
+
+### Story 8.2: Configure Native Splash Screen
+
+As a user,
+I want to see a branded splash screen immediately when the app launches,
+So that the cold start transition is seamless and branded.
+
+**Acceptance Criteria:**
+- A custom native splash screen is configured using `flutter_native_splash`.
+- Background color matches `--surface-primary` (#0D1117).
+- The splash screen centers the DocuMind AI logo.
