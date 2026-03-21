@@ -1,7 +1,9 @@
 import 'package:documind_ai/core/theme/app_spacing.dart';
 import 'package:documind_ai/core/theme/theme_extensions.dart';
+import 'package:documind_ai/features/auth/data/auth_api.dart';
 import 'package:documind_ai/features/auth/providers/auth_provider.dart';
 import 'package:documind_ai/features/settings/providers/theme_mode_provider.dart';
+import 'package:documind_ai/shared/widgets/app_snackbar.dart';
 import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,9 +76,16 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsActionRow(
             label: 'Reset Password',
             icon: Icons.lock_reset,
-            semanticsLabel: 'Reset password option unavailable in this version',
-            enabled: false,
-            onTap: null,
+            semanticsLabel: 'Reset password',
+            enabled: true,
+            onTap: () {
+              _handleResetPasswordTap(
+                context: context,
+                ref: ref,
+                authState: authState,
+                tokens: tokens,
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.sm),
           _SettingsActionRow(
@@ -160,6 +169,139 @@ class SettingsScreen extends ConsumerWidget {
       loading: () => 'Loading account email',
       error: (_, _) => 'Account email failed to load',
     );
+  }
+
+  Future<void> _handleResetPasswordTap({
+    required BuildContext context,
+    required WidgetRef ref,
+    required AsyncValue<AuthState> authState,
+    required DocuMindTokens tokens,
+  }) async {
+    if (authState.isLoading || authState.hasError) {
+      showWarningSnackBar(
+        context,
+        tokens,
+        'Account details are still loading. Please try again.',
+      );
+      return;
+    }
+
+    final email = authState.value?.userEmail?.trim();
+    if (email == null || email.isEmpty) {
+      showWarningSnackBar(
+        context,
+        tokens,
+        'No account email is available for password reset.',
+      );
+      return;
+    }
+
+    await _showResetPasswordDialog(
+      context: context,
+      ref: ref,
+      email: email,
+      tokens: tokens,
+    );
+  }
+
+  Future<void> _showResetPasswordDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String email,
+    required DocuMindTokens tokens,
+  }) async {
+    var isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submitResetRequest() async {
+              setDialogState(() {
+                isSubmitting = true;
+              });
+
+              try {
+                await ref.read(authApiProvider).resetPassword(email: email);
+
+                if (!dialogContext.mounted || !context.mounted) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop();
+                _showSuccessSnackBar(context, tokens);
+              } on AuthApiError catch (error) {
+                if (!dialogContext.mounted || !context.mounted) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop();
+                showPersistentErrorSnackBar(context, tokens, error.message);
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    isSubmitting = false;
+                  });
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Reset Password'),
+              content: Text('A password reset email will be sent to $email.'),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  style: TextButton.styleFrom(minimumSize: const Size(80, 44)),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isSubmitting ? null : submitResetRequest,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(90, 44),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSuccessSnackBar(BuildContext context, DocuMindTokens tokens) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: tokens.colors.accentSecondary,
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_outline),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'If an account exists, a password reset email has been sent.',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
   }
 }
 
