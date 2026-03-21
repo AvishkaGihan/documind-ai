@@ -106,6 +106,38 @@ void main() {
     );
   });
 
+  testWidgets('Login route renders DocuMind branding element', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      DocuMindApp(
+        initialLocation: '/auth/login',
+        overrides: [
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+      ),
+    );
+    await pumpFrames(tester, 4);
+
+    expect(find.text('DocuMind AI'), findsOneWidget);
+  });
+
+  testWidgets('Signup route renders DocuMind branding element', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      DocuMindApp(
+        initialLocation: '/auth/signup',
+        overrides: [
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+      ),
+    );
+    await pumpFrames(tester, 4);
+
+    expect(find.text('DocuMind AI'), findsOneWidget);
+  });
+
   testWidgets('Bottom tabs switch active destination', (
     WidgetTester tester,
   ) async {
