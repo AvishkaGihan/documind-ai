@@ -47,4 +47,35 @@ void main() {
       expect(sendCalls, 1);
     },
   );
+
+  testWidgets('input bar disables text field and send when disabled', (
+    WidgetTester tester,
+  ) async {
+    final controller = TextEditingController(text: 'Question');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: ChatInputBar(
+            controller: controller,
+            onChanged: (_) {},
+            onSend: () {},
+            isSending: false,
+            enabled: false,
+          ),
+        ),
+      ),
+    );
+
+    final textField = tester.widget<TextField>(
+      find.byKey(const Key('chat-input-text-field')),
+    );
+    expect(textField.enabled, isFalse);
+
+    final sendButton = tester.widget<IconButton>(
+      find.byKey(const Key('chat-send-button')),
+    );
+    expect(sendButton.onPressed, isNull);
+  });
 }

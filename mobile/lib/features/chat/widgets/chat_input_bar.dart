@@ -8,6 +8,7 @@ class ChatInputBar extends StatelessWidget {
     required this.onChanged,
     required this.onSend,
     required this.isSending,
+    this.enabled = true,
     super.key,
   });
 
@@ -15,6 +16,7 @@ class ChatInputBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
   final bool isSending;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +26,7 @@ class ChatInputBar extends StatelessWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
-        final canSend = value.text.trim().isNotEmpty && !isSending;
+        final canSend = enabled && value.text.trim().isNotEmpty && !isSending;
 
         return Container(
           key: const Key('chat-input-bar'),
@@ -45,6 +47,7 @@ class ChatInputBar extends StatelessWidget {
                 child: TextField(
                   key: const Key('chat-input-text-field'),
                   controller: controller,
+                  enabled: enabled,
                   minLines: 1,
                   maxLines: 4,
                   onChanged: onChanged,

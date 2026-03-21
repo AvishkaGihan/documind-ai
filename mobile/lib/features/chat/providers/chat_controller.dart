@@ -21,7 +21,10 @@ class ChatState {
     this.citationExcerpts = const <int, String>{},
     this.expandedCitationPages = const <int>{},
     this.announcement,
+    this.warningMessage,
     this.errorMessage,
+    this.rateLimitResetAt,
+    this.lastFailedQuestion,
     this.isDocumentReady = true,
   });
 
@@ -35,8 +38,31 @@ class ChatState {
   final Map<int, String> citationExcerpts;
   final Set<int> expandedCitationPages;
   final String? announcement;
+  final String? warningMessage;
   final String? errorMessage;
+  final DateTime? rateLimitResetAt;
+  final String? lastFailedQuestion;
   final bool isDocumentReady;
+
+  bool get isRateLimited {
+    final resetAt = rateLimitResetAt;
+    if (resetAt == null) {
+      return false;
+    }
+    return DateTime.now().toUtc().isBefore(resetAt);
+  }
+
+  int? get rateLimitRemainingSeconds {
+    final resetAt = rateLimitResetAt;
+    if (resetAt == null) {
+      return null;
+    }
+    final remaining = resetAt.difference(DateTime.now().toUtc()).inSeconds;
+    if (remaining <= 0) {
+      return 0;
+    }
+    return remaining;
+  }
 
   ChatState copyWith({
     String? documentId,
@@ -51,8 +77,14 @@ class ChatState {
     Set<int>? expandedCitationPages,
     String? announcement,
     bool clearAnnouncement = false,
+    String? warningMessage,
+    bool clearWarningMessage = false,
     String? errorMessage,
     bool clearErrorMessage = false,
+    DateTime? rateLimitResetAt,
+    bool clearRateLimitResetAt = false,
+    String? lastFailedQuestion,
+    bool clearLastFailedQuestion = false,
     bool? isDocumentReady,
   }) {
     return ChatState(
@@ -71,9 +103,18 @@ class ChatState {
       announcement: clearAnnouncement
           ? null
           : (announcement ?? this.announcement),
+      warningMessage: clearWarningMessage
+          ? null
+          : (warningMessage ?? this.warningMessage),
       errorMessage: clearErrorMessage
           ? null
           : (errorMessage ?? this.errorMessage),
+      rateLimitResetAt: clearRateLimitResetAt
+          ? null
+          : (rateLimitResetAt ?? this.rateLimitResetAt),
+      lastFailedQuestion: clearLastFailedQuestion
+          ? null
+          : (lastFailedQuestion ?? this.lastFailedQuestion),
       isDocumentReady: isDocumentReady ?? this.isDocumentReady,
     );
   }
@@ -89,6 +130,7 @@ class ChatController extends Notifier<ChatState> {
     0,
     isUtc: true,
   );
+  Timer? _rateLimitTimer;
 
   @override
   ChatState build() {
@@ -104,6 +146,7 @@ class ChatController extends Notifier<ChatState> {
       unawaited(_flushQueuedQuestions(currentDocumentId));
     });
     ref.onDispose(sub.cancel);
+    ref.onDispose(() => _rateLimitTimer?.cancel());
 
     return const ChatState();
   }
@@ -123,6 +166,9 @@ class ChatController extends Notifier<ChatState> {
       citationExcerpts: const <int, String>{},
       expandedCitationPages: const <int>{},
       clearErrorMessage: true,
+      clearWarningMessage: true,
+      clearRateLimitResetAt: true,
+      clearLastFailedQuestion: true,
       clearAnnouncement: true,
     );
 
@@ -198,6 +244,9 @@ class ChatController extends Notifier<ChatState> {
       citationExcerpts: const <int, String>{},
       expandedCitationPages: const <int>{},
       clearErrorMessage: true,
+      clearWarningMessage: true,
+      clearRateLimitResetAt: true,
+      clearLastFailedQuestion: true,
       clearAnnouncement: true,
     );
 
@@ -251,6 +300,10 @@ class ChatController extends Notifier<ChatState> {
     state = state.copyWith(clearErrorMessage: true);
   }
 
+  void clearWarning() {
+    state = state.copyWith(clearWarningMessage: true);
+  }
+
   void toggleCitation(int pageNumber) {
     final pages = Set<int>.from(state.expandedCitationPages);
     if (pages.contains(pageNumber)) {
@@ -267,6 +320,15 @@ class ChatController extends Notifier<ChatState> {
       return;
     }
 
+    if (_isRateLimitActive()) {
+      final seconds = _remainingRateLimitSeconds();
+      state = state.copyWith(
+        warningMessage:
+            "You've reached the query limit. Please wait $seconds seconds.",
+      );
+      return;
+    }
+
     final isOnline = ref.read(connectivityServiceProvider).isOnline;
     if (!isOnline) {
       await _queueOfflineQuestion(trimmed);
@@ -274,6 +336,24 @@ class ChatController extends Notifier<ChatState> {
     }
 
     await _sendOnlineQuestion(trimmed);
+  }
+
+  Future<void> retryLastFailedSend() async {
+    final documentId = state.documentId;
+    final lastFailedQuestion = state.lastFailedQuestion;
+    if (documentId == null ||
+        lastFailedQuestion == null ||
+        state.isStreaming ||
+        _isRateLimitActive()) {
+      return;
+    }
+
+    await _streamAnswer(
+      documentId: documentId,
+      question: lastFailedQuestion,
+      rethrowOnError: false,
+    );
+    await _persistMessages();
   }
 
   Future<void> _queueOfflineQuestion(String question) async {
@@ -338,10 +418,16 @@ class ChatController extends Notifier<ChatState> {
       messages: <ChatMessage>[...state.messages, userMessage],
       inputDraft: '',
       clearErrorMessage: true,
+      clearWarningMessage: true,
+      clearLastFailedQuestion: true,
       clearAnnouncement: true,
     );
 
-    await _streamAnswer(documentId: documentId, question: question);
+    await _streamAnswer(
+      documentId: documentId,
+      question: question,
+      rethrowOnError: false,
+    );
     await _persistMessages();
   }
 
@@ -349,6 +435,7 @@ class ChatController extends Notifier<ChatState> {
     required String documentId,
     required String question,
     String? queueId,
+    bool rethrowOnError = true,
   }) async {
     final inFlightAssistantId = _localId('assistant');
     final assistantMessage = ChatMessage(
@@ -395,6 +482,7 @@ class ChatController extends Notifier<ChatState> {
             state = state.copyWith(
               isStreaming: false,
               clearInFlightAnswerId: true,
+              clearLastFailedQuestion: true,
               announcement: 'Answer complete',
             );
             if (queueId != null) {
@@ -421,16 +509,41 @@ class ChatController extends Notifier<ChatState> {
       }
 
       _completeInFlight('');
-      state = state.copyWith(isStreaming: false, clearInFlightAnswerId: true);
-    } on ChatApiError catch (error) {
-      _appendToken('\n\n${error.message}');
-      _completeInFlight('');
       state = state.copyWith(
         isStreaming: false,
         clearInFlightAnswerId: true,
-        errorMessage: error.message,
+        clearLastFailedQuestion: true,
       );
-      rethrow;
+    } on ChatApiError catch (error) {
+      final isRateLimited = error.code.toUpperCase() == 'RATE_LIMITED';
+      if (!isRateLimited) {
+        _appendToken('\n\n${error.message}');
+      }
+      _completeInFlight('');
+
+      if (isRateLimited) {
+        _activateRateLimitCooldown(error.retryAfterSeconds);
+        final waitSeconds =
+            error.retryAfterSeconds ?? _remainingRateLimitSeconds();
+        state = state.copyWith(
+          isStreaming: false,
+          clearInFlightAnswerId: true,
+          warningMessage:
+              "You've reached the query limit. Please wait $waitSeconds seconds.",
+          clearErrorMessage: true,
+          lastFailedQuestion: question,
+        );
+      } else {
+        state = state.copyWith(
+          isStreaming: false,
+          clearInFlightAnswerId: true,
+          errorMessage: error.message,
+          lastFailedQuestion: question,
+        );
+      }
+      if (rethrowOnError) {
+        rethrow;
+      }
     }
   }
 
@@ -466,6 +579,7 @@ class ChatController extends Notifier<ChatState> {
             documentId: documentId,
             question: queued.question,
             queueId: queued.id,
+            rethrowOnError: true,
           );
           await _persistMessages();
         } on ChatApiError {
@@ -497,6 +611,48 @@ class ChatController extends Notifier<ChatState> {
     return code == 'NETWORK_ERROR' ||
         code == 'CONNECTION_ERROR' ||
         code == 'TIMEOUT';
+  }
+
+  bool _isRateLimitActive() {
+    final resetAt = state.rateLimitResetAt;
+    if (resetAt == null) {
+      return false;
+    }
+    if (DateTime.now().toUtc().isAfter(resetAt)) {
+      _clearRateLimitCooldown();
+      return false;
+    }
+    return true;
+  }
+
+  int _remainingRateLimitSeconds() {
+    final resetAt = state.rateLimitResetAt;
+    if (resetAt == null) {
+      return 60;
+    }
+    final remainingMs =
+        resetAt.millisecondsSinceEpoch -
+        DateTime.now().toUtc().millisecondsSinceEpoch;
+    return max(1, (remainingMs / 1000).ceil());
+  }
+
+  void _activateRateLimitCooldown(int? retryAfterSeconds) {
+    final seconds = retryAfterSeconds == null || retryAfterSeconds <= 0
+        ? 60
+        : retryAfterSeconds;
+    final resetAt = DateTime.now().toUtc().add(Duration(seconds: seconds));
+    _rateLimitTimer?.cancel();
+    _rateLimitTimer = Timer(
+      Duration(seconds: seconds),
+      _clearRateLimitCooldown,
+    );
+    state = state.copyWith(rateLimitResetAt: resetAt);
+  }
+
+  void _clearRateLimitCooldown() {
+    _rateLimitTimer?.cancel();
+    _rateLimitTimer = null;
+    state = state.copyWith(clearRateLimitResetAt: true);
   }
 
   void _appendToken(String token) {

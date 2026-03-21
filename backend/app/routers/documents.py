@@ -42,7 +42,7 @@ from app.services.document_service import (
     InvalidFileTypeError,
 )
 from app.services.processing.pipeline import process_document_pipeline
-from app.services.rag_service import RagService, RagServiceError
+from app.services.rag_service import RagService, RagServiceError, RagServiceRateLimitError
 
 router = APIRouter()
 async_session_dependency = Depends(get_async_session)
@@ -180,18 +180,41 @@ async def ask_document_question(
         )
 
         if is_streaming_request:
+            rag_events = rag_service.stream_answer_events(
+                user_id=current_user.id,
+                document_id=document_id,
+                question=payload.question,
+                conversation_history=prompt_history,
+            )
+            first_event = await anext(rag_events, None)
+
             async def _stream_events() -> AsyncIterator[str]:
                 answer_parts: list[str] = []
                 citations: list[dict[str, object]] = []
                 emitted_citation_pages: set[int] = set()
                 saw_error = False
 
-                async for event_name, event_payload in rag_service.stream_answer_events(
-                    user_id=current_user.id,
-                    document_id=document_id,
-                    question=payload.question,
-                    conversation_history=prompt_history,
-                ):
+                if first_event is not None:
+                    event_name, event_payload = first_event
+                    if event_name == "token":
+                        token = str(event_payload.get("content", ""))
+                        answer_parts.append(token)
+                    elif event_name == "citation":
+                        page = int(event_payload.get("page", 0))
+                        text = str(event_payload.get("text", ""))
+                        if page > 0 and text:
+                            citations.append({"page_number": page, "text": text})
+                            emitted_citation_pages.add(page)
+                    elif event_name == "error":
+                        saw_error = True
+
+                    yield format_sse_event(event_name, event_payload)
+                    await asyncio.sleep(0)
+
+                    if event_name == "error":
+                        return
+
+                async for event_name, event_payload in rag_events:
                     if event_name == "token":
                         token = str(event_payload.get("content", ""))
                         answer_parts.append(token)
@@ -260,6 +283,24 @@ async def ask_document_question(
                 code="DOCUMENT_NOT_READY",
                 message="Document is still processing. Try again when status is ready.",
             ),
+        ) from exc
+    except RagServiceRateLimitError as exc:
+        wait_seconds = exc.retry_after_seconds or 60
+        headers = (
+            {"Retry-After": str(exc.retry_after_seconds)}
+            if exc.retry_after_seconds is not None
+            else None
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=build_error_detail(
+                code="RATE_LIMITED",
+                message=(
+                    "You've reached the query limit. "
+                    f"Please wait {wait_seconds} seconds."
+                ),
+            ),
+            headers=headers,
         ) from exc
     except RagServiceError as exc:
         raise HTTPException(

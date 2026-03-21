@@ -165,6 +165,13 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.byIcon(Icons.error_outline),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Retry'), findsOneWidget);
 
     final retryAction = tester.widget<SnackBarAction>(
@@ -175,6 +182,100 @@ void main() {
 
     expect(attempts, 2);
     expect(find.byKey(const Key('upload-processing-label')), findsOneWidget);
+  });
+
+  testWidgets('library screen shows persistent snackbar on processing error', (
+    WidgetTester tester,
+  ) async {
+    final selectedFile = SelectedPdfFile(
+      name: 'bad.pdf',
+      sizeInBytes: 3072,
+      bytes: Uint8List.fromList(<int>[4, 5, 6]),
+    );
+
+    var attempts = 0;
+    var pollCalls = 0;
+    final api = _FakeDocumentsApi(
+      uploadHandler: ({required file, required onProgress}) async {
+        attempts += 1;
+        onProgress(100, 100);
+        return UploadedDocument(
+          id: 'doc-12',
+          title: 'bad',
+          fileSize: 3072,
+          pageCount: 3,
+          status: 'processing',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 20),
+        );
+      },
+      getHandler: (documentId) async {
+        pollCalls += 1;
+        if (pollCalls == 1) {
+          return UploadedDocument(
+            id: documentId,
+            title: 'bad',
+            fileSize: 3072,
+            pageCount: 3,
+            status: 'error',
+            errorMessage: 'Failed to extract text from PDF',
+            createdAt: DateTime.utc(2026, 3, 20),
+          );
+        }
+        return UploadedDocument(
+          id: documentId,
+          title: 'bad',
+          fileSize: 3072,
+          pageCount: 3,
+          status: 'processing',
+          errorMessage: null,
+          createdAt: DateTime.utc(2026, 3, 20),
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          pdfFilePickerProvider.overrideWithValue(
+            _FakePdfFilePickerService(selectedFile),
+          ),
+          documentsApiProvider.overrideWithValue(api),
+          connectivityServiceProvider.overrideWithValue(
+            _FakeConnectivityService(initialOnline: true),
+          ),
+          localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: const LibraryScreen(),
+        ),
+      ),
+    );
+
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('library-upload-fab')));
+    await pumpFrames(tester, 4);
+
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text(
+          "This file isn't a valid PDF. Please upload a PDF file.",
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBarAction), findsOneWidget);
+
+    final retryAction = tester.widget<SnackBarAction>(
+      find.byType(SnackBarAction),
+    );
+    retryAction.onPressed();
+    await pumpFrames(tester, 3);
+
+    expect(attempts, 2);
   });
 
   testWidgets('library shows queued upload indicator when offline', (
