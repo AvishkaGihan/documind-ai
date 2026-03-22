@@ -4,8 +4,8 @@
 [![Mobile CI](https://github.com/AvishkaGihan/documind-ai/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/AvishkaGihan/documind-ai/actions/workflows/mobile-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Banner Image Placeholder](https://via.placeholder.com/1200x300.png?text=DocuMind+AI+Banner+Image)
-*(Add your beautiful banner image above)*
+![Banner Image](docs/images/repo_banner.png)
+
 
 ## 📖 Overview
 **DocuMind AI** is a secure, high-performance RAG (Retrieval-Augmented Generation) platform that allows users to upload PDFs and engage in contextual chat conversations. Designed with privacy first, it guarantees **strict user data isolation** for enterprise-grade safety, processing your documents with blazing fast LLaMA 3.3 inference.
@@ -39,13 +39,15 @@
 
 ## 📸 Screenshots
 
-| Login & Auth | Home & Library | Chat Interface |
+| Splash Screen | Login & Auth | Home & Library |
 | :---: | :---: | :---: |
-| ![Login Screen](https://via.placeholder.com/300x600.png?text=Login+Screen) | ![Library](https://via.placeholder.com/300x600.png?text=Library+Screen) | ![Chat](https://via.placeholder.com/300x600.png?text=Chat+Interface) |
+| ![Splash Screen](docs/images/splash_screen.png) | ![Login Screen](docs/images/login_screen.png) | ![Library](docs/images/library_screen.png) |
 
-| Document Citations | Settings |
-| :---: | :---: |
-| ![Citations](https://via.placeholder.com/300x600.png?text=Citation+View) | ![Settings Screen](https://via.placeholder.com/300x600.png?text=Settings+Screen) |
+| Chat Interface | Document Citations | Settings |
+| :---: | :---: | :---: |
+| ![Chat](docs/images/chat_screen.png) | ![Citations](docs/images/citation_view.png) | ![Settings Screen](docs/images/settings_screen.png) |
+
+
 
 
 ## 📐 Architecture
