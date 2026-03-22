@@ -54,20 +54,21 @@ Our architecture strictly enforces separation of concerns and physical vector is
 
 ```mermaid
 graph TD
-    User([📱 User App]) -->|1. Upload PDF| API[🐍 FastAPI Backend]
-    API -->|2. Store File| S3[(Storage - S3/Cloud)]
+    User(["📱 User App"]) -->|1. Upload PDF| API["🐍 FastAPI Backend"]
+    API -->|2. Store File| S3[("Storage - S3/Cloud")]
     
-    API -->|3. Process| Process[⚙️ Extraction & Chunking]
-    Process -->|4. Generate Vectors| Embed[🧠 Sentence Transformers <br> (Local)]
-    Embed -->|5. Isolate| VDB[(🗄️ ChromaDB <br> user_X_doc_Y)]
+    API -->|3. Process| Process["⚙️ Extraction & Chunking"]
+    Process -->|4. Generate Vectors| Embed["🧠 Sentence Transformers <br> (Local)"]
+    Embed -->|5. Isolate| VDB[("🗄️ ChromaDB <br> user_X_doc_Y")]
 
     User -->|6. Ask Question| API
     API -->|7. Query| VDB
     VDB -->|8. Relevant Chunks| API
-    API -->|9. Context + Prompt| Groq[🚀 Groq API <br> LLaMA 3.3 70B]
+    API -->|9. Context + Prompt| Groq["🚀 Groq API <br> LLaMA 3.3 70B"]
     Groq -->|10. Stream Answer| API
     API -->|11. Event Stream Response| User
 ```
+
 
 ## 📂 Folder Structure
 
