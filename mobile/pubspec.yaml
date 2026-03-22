@@ -55,6 +55,7 @@ dev_dependencies:
   freezed: ^3.2.2
   json_serializable: ^6.11.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

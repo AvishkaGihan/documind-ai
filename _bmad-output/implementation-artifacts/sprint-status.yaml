@@ -1,5 +1,5 @@
 # generated: 2026-03-14T19:43:58+05:30
-# last_updated: "2026-03-22T02:36:10+05:30"
+# last_updated: "2026-03-22T02:41:22+05:30"
 # project: documind-ai
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-14T19:43:58+05:30"
-last_updated: "2026-03-22T02:36:10+05:30"
+last_updated: "2026-03-22T02:41:22+05:30"
 project: "documind-ai"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -92,4 +92,4 @@ development_status:
   epic-7-retrospective: done
   epic-8: in-progress
   8-1-configure-app-display-name-and-launcher-icon: done
-  8-2-configure-native-splash-screen: backlog
+  8-2-configure-native-splash-screen: review
