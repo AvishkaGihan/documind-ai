@@ -1,0 +1,957 @@
+import 'package:documind_ai/core/layout/responsive_breakpoints.dart';
+import 'package:documind_ai/core/theme/app_spacing.dart';
+import 'package:documind_ai/core/theme/theme_extensions.dart';
+import 'package:documind_ai/features/library/data/documents_api.dart';
+import 'package:documind_ai/features/library/models/document_upload_models.dart';
+import 'package:documind_ai/features/library/providers/document_list_provider.dart';
+import 'package:documind_ai/features/library/providers/document_upload_controller.dart';
+import 'package:documind_ai/features/library/widgets/document_card.dart';
+import 'package:documind_ai/features/library/widgets/document_upload_card.dart';
+import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
+import 'package:documind_ai/shared/widgets/app_snackbar.dart';
+import 'package:documind_ai/shared/widgets/loading_shimmer.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+enum LibrarySortMode { date, name, status }
+
+class LibraryScreen extends ConsumerStatefulWidget {
+  const LibraryScreen({super.key});
+
+  @override
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen>
+    with WidgetsBindingObserver {
+  bool _isSearching = false;
+  String _searchQuery = '';
+  LibrarySortMode _sortMode = LibrarySortMode.date;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(documentUploadControllerProvider.notifier).flushQueuedUploads();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final widthClass = classifyScreenWidth(MediaQuery.sizeOf(context).width);
+    final loadingPadding = widthClass.isSmallPhone
+        ? AppSpacing.md
+        : AppSpacing.lg;
+    final theme = Theme.of(context);
+    final tokens = theme.extension<DocuMindTokens>()!;
+    final uploadState = ref.watch(documentUploadControllerProvider);
+    final documentsAsync = ref.watch(documentListProvider).documents;
+    final isSearching = _isSearching;
+    final searchQuery = _searchQuery;
+    final sortMode = _sortMode;
+
+    ref.listen<DocumentUploadState>(documentUploadControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (next.announcement != null &&
+          next.announcement != previous?.announcement) {
+        final textDirection = Directionality.of(context);
+        SemanticsService.sendAnnouncement(
+          View.of(context),
+          next.announcement!,
+          textDirection,
+        );
+        ref.read(documentUploadControllerProvider.notifier).clearAnnouncement();
+      }
+
+      final justFailed =
+          next.phase == UploadCardPhase.failed &&
+          previous?.phase != UploadCardPhase.failed;
+      if (justFailed && next.error != null) {
+        showPersistentErrorSnackBar(
+          context,
+          tokens,
+          next.error!.message,
+          onRetry: () {
+            ref.read(documentUploadControllerProvider.notifier).retryUpload();
+          },
+        );
+      }
+
+      final justProcessingFailed =
+          next.phase == UploadCardPhase.processingError &&
+          previous?.phase != UploadCardPhase.processingError;
+      if (justProcessingFailed) {
+        showPersistentErrorSnackBar(
+          context,
+          tokens,
+          _userFriendlyProcessingError(next.uploadedDocument?.errorMessage),
+          onRetry: () {
+            ref.read(documentUploadControllerProvider.notifier).retryUpload();
+          },
+        );
+      }
+    });
+
+    ref.listen<DocumentListState>(documentListProvider, (previous, next) {
+      final announcement = next.announcement;
+      if (announcement == null || announcement == previous?.announcement) {
+        return;
+      }
+
+      final textDirection = Directionality.of(context);
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        announcement,
+        textDirection,
+      );
+      ref.read(documentListProvider.notifier).clearAnnouncement();
+    });
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Document Library'),
+        actions: [
+          Semantics(
+            button: true,
+            label: isSearching ? 'Close search' : 'Search documents',
+            child: AccessibilityFocusRing(
+              borderRadius: 22,
+              child: IconButton(
+                key: const Key('library-search-button'),
+                tooltip: isSearching ? 'Close search' : 'Search documents',
+                onPressed: () {
+                  if (isSearching) {
+                    setState(() {
+                      _searchQuery = '';
+                      _isSearching = false;
+                    });
+                    _searchController.clear();
+                    return;
+                  }
+                  setState(() {
+                    _isSearching = true;
+                  });
+                },
+                icon: ExcludeSemantics(
+                  child: Icon(isSearching ? Icons.close : Icons.search),
+                ),
+              ),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Sort documents',
+            child: AccessibilityFocusRing(
+              borderRadius: 22,
+              child: IconButton(
+                key: const Key('library-sort-button'),
+                tooltip: 'Sort documents',
+                onPressed: () async {
+                  final selected = await _showSortOptions(context, sortMode);
+                  if (selected != null && context.mounted) {
+                    setState(() {
+                      _sortMode = selected;
+                    });
+                  }
+                },
+                icon: const ExcludeSemantics(child: Icon(Icons.sort)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: tokens.colors.surfacePrimary,
+      floatingActionButton: Semantics(
+        button: true,
+        label: 'Upload PDF',
+        child: AccessibilityFocusRing(
+          borderRadius: 30,
+          child: FloatingActionButton(
+            key: const Key('library-upload-fab'),
+            onPressed: () {
+              ref
+                  .read(documentUploadControllerProvider.notifier)
+                  .pickAndUpload();
+            },
+            tooltip: 'Upload PDF',
+            child: const ExcludeSemantics(child: Icon(Icons.add)),
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(documentListProvider.notifier).refresh(),
+        child: documentsAsync.when(
+          data: (response) {
+            final visibleDocuments = _applySearchAndSort(
+              response.items,
+              searchQuery,
+              sortMode,
+            );
+
+            return _LibraryContent(
+              documents: visibleDocuments,
+              hasAnyDocuments: response.items.isNotEmpty,
+              isSearching: isSearching,
+              searchQuery: searchQuery,
+              onSearchQueryChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              searchController: _searchController,
+              onClearSearch: () {
+                setState(() {
+                  _searchQuery = '';
+                });
+                _searchController.clear();
+              },
+              onCloseSearch: () {
+                setState(() {
+                  _searchQuery = '';
+                  _isSearching = false;
+                });
+                _searchController.clear();
+              },
+              uploadState: uploadState,
+              onUploadTap: () {
+                ref
+                    .read(documentUploadControllerProvider.notifier)
+                    .pickAndUpload();
+              },
+              onUploadRetry: () {
+                ref
+                    .read(documentUploadControllerProvider.notifier)
+                    .retryUpload();
+              },
+              onUploadReadyTap: uploadState.uploadedDocument == null
+                  ? null
+                  : () {
+                      context.go('/chat/${uploadState.uploadedDocument!.id}');
+                    },
+              onDocumentTap: (document) {
+                context.go('/chat/${document.id}');
+              },
+              onDocumentLongPress: (document) {
+                _showDocumentActions(context, ref, document);
+              },
+            );
+          },
+          loading: () => ListView(
+            key: const Key('library-loading-skeleton-list'),
+            padding: EdgeInsets.all(loadingPadding),
+            children: const [
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.md),
+                child: LibraryDocumentSkeletonCard(
+                  key: Key('library-loading-skeleton-card-0'),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.md),
+                child: LibraryDocumentSkeletonCard(
+                  key: Key('library-loading-skeleton-card-1'),
+                ),
+              ),
+              LibraryDocumentSkeletonCard(
+                key: Key('library-loading-skeleton-card-2'),
+              ),
+            ],
+          ),
+          error: (error, _) => ListView(
+            padding: EdgeInsets.all(loadingPadding),
+            children: [
+              Text(
+                'Unable to load documents right now.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: tokens.colors.accentError,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton(
+                onPressed: () {
+                  ref.read(documentListProvider.notifier).refresh();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDocumentActions(
+    BuildContext context,
+    WidgetRef ref,
+    UploadedDocument document,
+  ) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(
+        context,
+      ).extension<DocuMindTokens>()!.colors.surfaceSecondary,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                key: Key('document-card-menu-info-${document.id}'),
+                minVerticalPadding: AppSpacing.md,
+                minTileHeight: 44,
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Info'),
+                onTap: () => Navigator.of(sheetContext).pop('info'),
+              ),
+              ListTile(
+                key: Key('document-card-menu-delete-${document.id}'),
+                minVerticalPadding: AppSpacing.md,
+                minTileHeight: 44,
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Delete'),
+                onTap: () => Navigator.of(sheetContext).pop('delete'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (action == 'info') {
+      await _showInfoDialog(context, document);
+      return;
+    }
+    if (action == 'delete') {
+      await _confirmAndDelete(context, ref, document);
+    }
+  }
+
+  Future<void> _showInfoDialog(
+    BuildContext context,
+    UploadedDocument document,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Document info'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Title: ${document.title}'),
+              Text('Status: ${document.status}'),
+              Text('Created: ${document.createdAt.toIso8601String()}'),
+              Text('Pages: ${document.pageCount}'),
+              Text('File size: ${document.fileSize} bytes'),
+              if (document.errorMessage != null)
+                Text('Error: ${document.errorMessage!}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmAndDelete(
+    BuildContext context,
+    WidgetRef ref,
+    UploadedDocument document,
+  ) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete document?'),
+          content: Text('This will permanently remove "${document.title}".'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('confirm-delete-document-button'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !context.mounted) {
+      return;
+    }
+
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    final api = ref.read(documentsApiProvider);
+
+    try {
+      await api.deleteDocument(document.id);
+      await ref.read(documentListProvider.notifier).refresh();
+    } on LibraryApiError catch (error) {
+      final isNotFound =
+          error.code == 'DOCUMENT_NOT_FOUND' ||
+          error.code == 'NOT_FOUND' ||
+          error.message.toLowerCase().contains('not found');
+
+      if (isNotFound) {
+        await ref.read(documentListProvider.notifier).refresh();
+      }
+
+      if (!context.mounted) {
+        return;
+      }
+
+      final message = isNotFound ? 'Document not found.' : error.message;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: tokens.colors.accentError,
+          ),
+        );
+    }
+  }
+
+  Future<LibrarySortMode?> _showSortOptions(
+    BuildContext context,
+    LibrarySortMode currentMode,
+  ) {
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    return showModalBottomSheet<LibrarySortMode>(
+      context: context,
+      backgroundColor: tokens.colors.surfaceSecondary,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                key: const Key('library-sort-date'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.schedule_outlined),
+                title: const Text('Date (newest first)'),
+                trailing: currentMode == LibrarySortMode.date
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.date),
+              ),
+              ListTile(
+                key: const Key('library-sort-name'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.sort_by_alpha_outlined),
+                title: const Text('Name (A-Z)'),
+                trailing: currentMode == LibrarySortMode.name
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.name),
+              ),
+              ListTile(
+                key: const Key('library-sort-status'),
+                minTileHeight: 44,
+                minVerticalPadding: AppSpacing.md,
+                leading: const Icon(Icons.tune_outlined),
+                title: const Text('Status (processing first)'),
+                trailing: currentMode == LibrarySortMode.status
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(LibrarySortMode.status),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _userFriendlyProcessingError(String? backendMessage) {
+  const fallback =
+      'We could not process this file. Please upload a valid PDF and try again.';
+  if (backendMessage == null || backendMessage.trim().isEmpty) {
+    return fallback;
+  }
+
+  final normalized = backendMessage.toLowerCase();
+  if (normalized.contains('failed to extract text from pdf') ||
+      normalized.contains('extract text') ||
+      normalized.contains('corrupt')) {
+    return "This file isn't a valid PDF. Please upload a PDF file.";
+  }
+
+  return backendMessage;
+}
+
+class _LibraryContent extends StatelessWidget {
+  const _LibraryContent({
+    required this.documents,
+    required this.hasAnyDocuments,
+    required this.isSearching,
+    required this.searchQuery,
+    required this.onSearchQueryChanged,
+    required this.searchController,
+    required this.onClearSearch,
+    required this.onCloseSearch,
+    required this.uploadState,
+    required this.onUploadTap,
+    required this.onUploadRetry,
+    required this.onUploadReadyTap,
+    required this.onDocumentTap,
+    required this.onDocumentLongPress,
+  });
+
+  final List<UploadedDocument> documents;
+  final bool hasAnyDocuments;
+  final bool isSearching;
+  final String searchQuery;
+  final ValueChanged<String> onSearchQueryChanged;
+  final TextEditingController searchController;
+  final VoidCallback onClearSearch;
+  final VoidCallback onCloseSearch;
+  final DocumentUploadState uploadState;
+  final VoidCallback onUploadTap;
+  final VoidCallback onUploadRetry;
+  final VoidCallback? onUploadReadyTap;
+  final void Function(UploadedDocument document) onDocumentTap;
+  final void Function(UploadedDocument document) onDocumentLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = theme.extension<DocuMindTokens>()!;
+    final widthClass = classifyScreenWidth(MediaQuery.sizeOf(context).width);
+    final showUploadCard = uploadState.phase != UploadCardPhase.idle;
+    final showNoResults =
+        searchQuery.trim().isNotEmpty && documents.isEmpty && hasAnyDocuments;
+    final isEmpty =
+        !showNoResults &&
+        documents.isEmpty &&
+        !showUploadCard &&
+        !hasAnyDocuments;
+
+    List<Widget> buildSearchHeader() {
+      if (!isSearching) {
+        return const <Widget>[];
+      }
+
+      return <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: TextField(
+            key: const Key('library-search-field'),
+            autofocus: true,
+            onChanged: onSearchQueryChanged,
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search documents',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: searchQuery.isNotEmpty
+                  ? IconButton(
+                      key: const Key('library-clear-search'),
+                      tooltip: 'Clear search',
+                      onPressed: onClearSearch,
+                      icon: const Icon(Icons.clear),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final horizontalPadding = widthClass.isSmallPhone
+        ? AppSpacing.md
+        : AppSpacing.lg;
+    final itemSpacing = widthClass.isSmallPhone ? AppSpacing.sm : AppSpacing.md;
+
+    if (isEmpty) {
+      return ListView(
+        key: const Key('library-layout-list'),
+        padding: EdgeInsets.all(horizontalPadding),
+        children: [
+          ...buildSearchHeader(),
+          const SizedBox(height: AppSpacing.x2l),
+          Icon(
+            Icons.picture_as_pdf_outlined,
+            size: 56,
+            color: tokens.colors.textTertiary,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Upload your first PDF',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: tokens.colors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Your documents will appear here once uploaded.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: tokens.colors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Center(
+            child: Semantics(
+              button: true,
+              label: 'Upload your first PDF',
+              child: FilledButton.icon(
+                key: const Key('library-empty-upload-cta'),
+                onPressed: onUploadTap,
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('Upload PDF'),
+              ),
+            ),
+          ),
+          if (isSearching)
+            Center(
+              child: TextButton(
+                key: const Key('library-close-search'),
+                onPressed: onCloseSearch,
+                child: const Text('Cancel search'),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final constrainedWidthClass = classifyScreenWidth(width);
+
+        if (constrainedWidthClass.isTablet) {
+          return _buildTabletGrid(
+            context: context,
+            showUploadCard: showUploadCard,
+            showNoResults: showNoResults,
+            searchHeader: buildSearchHeader(),
+            horizontalPadding: horizontalPadding,
+            itemSpacing: itemSpacing,
+          );
+        }
+
+        return _buildPhoneList(
+          context: context,
+          showUploadCard: showUploadCard,
+          showNoResults: showNoResults,
+          searchHeader: buildSearchHeader(),
+          horizontalPadding: horizontalPadding,
+          itemSpacing: itemSpacing,
+        );
+      },
+    );
+  }
+
+  Widget _buildPhoneList({
+    required BuildContext context,
+    required bool showUploadCard,
+    required bool showNoResults,
+    required List<Widget> searchHeader,
+    required double horizontalPadding,
+    required double itemSpacing,
+  }) {
+    final totalCount =
+        searchHeader.length +
+        (showUploadCard ? 1 : 0) +
+        (showNoResults ? 1 : 0) +
+        documents.length +
+        (isSearching ? 1 : 0);
+
+    return ListView.builder(
+      key: const Key('library-layout-list'),
+      padding: EdgeInsets.all(horizontalPadding),
+      itemCount: totalCount,
+      itemBuilder: (context, index) {
+        var cursor = 0;
+
+        if (index < searchHeader.length) {
+          return searchHeader[index];
+        }
+        cursor += searchHeader.length;
+
+        if (showUploadCard && index == cursor) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: itemSpacing),
+            child: DocumentUploadCard(
+              state: uploadState,
+              onRetry: onUploadRetry,
+              onReadyTap: onUploadReadyTap,
+            ),
+          );
+        }
+        if (showUploadCard) {
+          cursor += 1;
+        }
+
+        if (showNoResults && index == cursor) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+            child: Center(
+              child: Column(
+                children: [
+                  Text(
+                    'No documents match your search',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).extension<DocuMindTokens>()!.colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton(
+                    key: const Key('library-clear-search-empty'),
+                    onPressed: onClearSearch,
+                    child: const Text('Clear search'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        if (showNoResults) {
+          cursor += 1;
+        }
+
+        final documentIndex = index - cursor;
+        if (documentIndex >= 0 && documentIndex < documents.length) {
+          final document = documents[documentIndex];
+          return Padding(
+            padding: EdgeInsets.only(bottom: itemSpacing),
+            child: Hero(
+              tag: 'document-${document.id}',
+              child: DocumentCard(
+                document: document,
+                onTap: () => onDocumentTap(document),
+                onLongPress: () => onDocumentLongPress(document),
+              ),
+            ),
+          );
+        }
+
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const Key('library-close-search'),
+            onPressed: onCloseSearch,
+            child: const Text('Cancel search'),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabletGrid({
+    required BuildContext context,
+    required bool showUploadCard,
+    required bool showNoResults,
+    required List<Widget> searchHeader,
+    required double horizontalPadding,
+    required double itemSpacing,
+  }) {
+    final topItems = <Widget>[
+      ...searchHeader,
+      if (showUploadCard)
+        Padding(
+          padding: EdgeInsets.only(bottom: itemSpacing),
+          child: DocumentUploadCard(
+            state: uploadState,
+            onRetry: onUploadRetry,
+            onReadyTap: onUploadReadyTap,
+          ),
+        ),
+      if (showNoResults)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Center(
+            child: Column(
+              children: [
+                Text(
+                  'No documents match your search',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).extension<DocuMindTokens>()!.colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextButton(
+                  key: const Key('library-clear-search-empty'),
+                  onPressed: onClearSearch,
+                  child: const Text('Clear search'),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ];
+
+    return CustomScrollView(
+      key: const Key('library-layout-grid'),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            horizontalPadding,
+            horizontalPadding,
+            0,
+          ),
+          sliver: SliverList(delegate: SliverChildListDelegate(topItems)),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            0,
+            horizontalPadding,
+            horizontalPadding,
+          ),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final document = documents[index];
+              return Hero(
+                tag: 'document-${document.id}',
+                child: DocumentCard(
+                  document: document,
+                  onTap: () => onDocumentTap(document),
+                  onLongPress: () => onDocumentLongPress(document),
+                ),
+              );
+            }, childCount: documents.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: itemSpacing,
+              mainAxisSpacing: itemSpacing,
+              childAspectRatio: 1.95,
+            ),
+          ),
+        ),
+        if (isSearching)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: horizontalPadding,
+                right: horizontalPadding,
+                bottom: horizontalPadding,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const Key('library-close-search'),
+                  onPressed: onCloseSearch,
+                  child: const Text('Cancel search'),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+List<UploadedDocument> _applySearchAndSort(
+  List<UploadedDocument> documents,
+  String query,
+  LibrarySortMode sortMode,
+) {
+  final normalizedQuery = query.trim().toLowerCase();
+
+  final filtered = documents
+      .where(
+        (document) =>
+            normalizedQuery.isEmpty ||
+            document.title.toLowerCase().contains(normalizedQuery),
+      )
+      .toList(growable: false);
+
+  final sorted = filtered.toList(growable: false)
+    ..sort((a, b) {
+      switch (sortMode) {
+        case LibrarySortMode.date:
+          return _compareDateThenId(a, b);
+        case LibrarySortMode.name:
+          final nameCompare = a.title.toLowerCase().compareTo(
+            b.title.toLowerCase(),
+          );
+          if (nameCompare != 0) {
+            return nameCompare;
+          }
+          final dateCompare = _compareDateThenId(a, b);
+          if (dateCompare != 0) {
+            return dateCompare;
+          }
+          return a.id.compareTo(b.id);
+        case LibrarySortMode.status:
+          final statusCompare = _statusGroupOrder(
+            a.status,
+          ).compareTo(_statusGroupOrder(b.status));
+          if (statusCompare != 0) {
+            return statusCompare;
+          }
+          return _compareDateThenId(a, b);
+      }
+    });
+
+  return sorted;
+}
+
+int _statusGroupOrder(String status) {
+  if (status == 'ready') {
+    return 1;
+  }
+  if (status == 'error') {
+    return 2;
+  }
+  return 0;
+}
+
+int _compareDateThenId(UploadedDocument a, UploadedDocument b) {
+  final dateCompare = b.createdAt.compareTo(a.createdAt);
+  if (dateCompare != 0) {
+    return dateCompare;
+  }
+  return a.id.compareTo(b.id);
+}

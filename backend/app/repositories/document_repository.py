@@ -1,0 +1,154 @@
+from uuid import UUID
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.document import Document, DocumentStatus
+
+
+async def create_document(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    title: str,
+    file_path: str,
+    file_size: int,
+    page_count: int,
+    status: DocumentStatus,
+) -> Document:
+    document = Document(
+        user_id=user_id,
+        title=title,
+        file_path=file_path,
+        file_size=file_size,
+        page_count=page_count,
+        status=status,
+    )
+    session.add(document)
+    await session.commit()
+    await session.refresh(document)
+    return document
+
+
+async def get_document_by_id(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+) -> Document | None:
+    result = await session.execute(select(Document).where(Document.id == document_id))
+    return result.scalar_one_or_none()
+
+
+async def get_document_for_user(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    user_id: UUID,
+) -> Document | None:
+    result = await session.execute(
+        select(Document).where(
+            Document.id == document_id,
+            Document.user_id == user_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_documents_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    page: int,
+    page_size: int,
+    search: str | None = None,
+) -> list[Document]:
+    query = select(Document).where(Document.user_id == user_id)
+
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(func.lower(Document.title).like(search_term))
+
+    offset = (page - 1) * page_size
+    query = query.order_by(
+        Document.created_at.desc(),
+        Document.id.desc(),
+    ).offset(offset).limit(page_size)
+
+    result = await session.execute(query)
+    return list(result.scalars().all())
+
+
+async def count_documents_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    search: str | None = None,
+) -> int:
+    query = select(func.count()).select_from(Document).where(Document.user_id == user_id)
+
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(func.lower(Document.title).like(search_term))
+
+    result = await session.execute(query)
+    return int(result.scalar_one())
+
+
+async def update_document_status(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    status: DocumentStatus,
+    error_message: str | None = None,
+) -> Document:
+    document = await get_document_by_id(session, document_id=document_id)
+    if document is None:
+        raise ValueError(f"Document not found: {document_id}")
+
+    document.status = status
+    document.error_message = error_message
+    await session.commit()
+    await session.refresh(document)
+    return document
+
+
+async def update_document_page_count(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    page_count: int,
+) -> Document:
+    document = await get_document_by_id(session, document_id=document_id)
+    if document is None:
+        raise ValueError(f"Document not found: {document_id}")
+
+    document.page_count = page_count
+    await session.commit()
+    await session.refresh(document)
+    return document
+
+
+async def delete_document_for_user(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    user_id: UUID,
+) -> int:
+    result = await session.execute(
+        delete(Document).where(
+            Document.id == document_id,
+            Document.user_id == user_id,
+        )
+    )
+    return int(result.rowcount or 0)
+
+
+async def list_document_ids_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+) -> list[UUID]:
+    result = await session.execute(
+        select(Document.id).where(Document.user_id == user_id).order_by(Document.id)
+    )
+    return list(result.scalars().all())
