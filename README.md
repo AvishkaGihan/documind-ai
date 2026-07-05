@@ -4,7 +4,7 @@
 [![Mobile CI](https://github.com/AvishkaGihan/documind-ai/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/AvishkaGihan/documind-ai/actions/workflows/mobile-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Banner Image](docs/images/repo_banner.png)
+![Banner Image](docs/images/cover.png)
 
 
 ## 📖 Overview
@@ -41,11 +41,11 @@
 
 | Splash Screen | Login & Auth | Home & Library |
 | :---: | :---: | :---: |
-| ![Splash Screen](docs/images/splash_screen.png) | ![Login Screen](docs/images/login_screen.png) | ![Library](docs/images/library_screen.png) |
+| ![Splash Screen](docs/images/splash_screen.jpeg) | ![Login Screen](docs/images/login_screen.jpeg) | ![Library](docs/images/library_screen.jpeg) |
 
 | Chat Interface | Document Citations | Settings |
 | :---: | :---: | :---: |
-| ![Chat](docs/images/chat_screen.png) | ![Citations](docs/images/citation_view.png) | ![Settings Screen](docs/images/settings_screen.png) |
+| ![Chat](docs/images/chat_screen.jpeg) | ![Citations](docs/images/citation_view.jpeg) | ![Settings Screen](docs/images/settings_screen.jpeg) |
 
 
 
