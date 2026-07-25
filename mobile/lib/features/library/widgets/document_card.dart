@@ -181,12 +181,29 @@ class _DocumentCardState extends State<DocumentCard>
           )
         : cardBody;
 
+    // Handle gestures and drive the press animation
+    final interactiveCard = GestureDetector(
+      onTapDown: (_) => _pressController.forward(),
+      onTapUp: (_) {
+        _pressController.reverse();
+        if (isReady && widget.onTap != null) {
+          widget.onTap!();
+        }
+      },
+      onTapCancel: () => _pressController.reverse(),
+      onLongPress: () {
+        _pressController.reverse();
+        widget.onLongPress();
+      },
+      child: borderedCard,
+    );
+
     // Wrap in semantics
     final semanticCard = Semantics(
       label:
           'Document ${doc.title}. Status ${_statusLabel(doc.status)}.',
       button: isReady,
-      child: borderedCard,
+      child: interactiveCard,
     );
 
     return AnimatedBuilder(
