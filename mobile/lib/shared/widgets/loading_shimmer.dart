@@ -110,40 +110,94 @@ class LoadingShimmerBox extends StatelessWidget {
   }
 }
 
+/// Updated skeleton card matching the redesigned [DocumentCard] layout:
+/// accent bar + icon + title/metadata + status chip.
 class LibraryDocumentSkeletonCard extends StatelessWidget {
   const LibraryDocumentSkeletonCard({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          LoadingShimmerBox(
-            width: 28,
-            height: 28,
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-          SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LoadingShimmerBox(width: 180, height: 16),
-                SizedBox(height: AppSpacing.sm),
-                LoadingShimmerBox(width: 220, height: 12),
-              ],
+      decoration: BoxDecoration(
+        color: tokens.colors.surfaceSecondary.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: tokens.colors.borderDefault.withValues(alpha: 0.5),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Accent bar skeleton
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: tokens.colors.surfaceTertiary,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(20),
+                ),
+              ),
             ),
-          ),
-          SizedBox(width: AppSpacing.sm),
-          LoadingShimmerBox(
-            width: 12,
-            height: 12,
-            borderRadius: BorderRadius.all(Radius.circular(20)),
-          ),
-        ],
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top row: icon + title + chip
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        // Icon skeleton
+                        LoadingShimmerBox(
+                          width: 36,
+                          height: 36,
+                          borderRadius:
+                              BorderRadius.all(Radius.circular(10)),
+                        ),
+                        SizedBox(width: AppSpacing.md),
+                        // Title skeleton
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LoadingShimmerBox(width: 180, height: 14),
+                              SizedBox(height: 6),
+                              LoadingShimmerBox(width: 120, height: 14),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        // Chip skeleton
+                        LoadingShimmerBox(
+                          width: 52,
+                          height: 20,
+                          borderRadius:
+                              BorderRadius.all(Radius.circular(8)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Metadata row skeleton
+                    const Row(
+                      children: [
+                        LoadingShimmerBox(width: 70, height: 10),
+                        SizedBox(width: AppSpacing.md),
+                        LoadingShimmerBox(width: 60, height: 10),
+                        SizedBox(width: AppSpacing.md),
+                        LoadingShimmerBox(width: 50, height: 10),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
