@@ -600,55 +600,157 @@ class _LibraryContent extends StatelessWidget {
     final itemSpacing = widthClass.isSmallPhone ? AppSpacing.sm : AppSpacing.md;
 
     if (isEmpty) {
-      return ListView(
+      return CustomScrollView(
         key: const Key('library-layout-list'),
-        padding: EdgeInsets.all(horizontalPadding),
-        children: [
-          ...buildSearchHeader(),
-          const SizedBox(height: AppSpacing.x2l),
-          Icon(
-            Icons.picture_as_pdf_outlined,
-            size: 56,
-            color: tokens.colors.textTertiary,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Upload your first PDF',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: tokens.colors.textPrimary,
-              fontWeight: FontWeight.w600,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.all(horizontalPadding),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(buildSearchHeader()),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Your documents will appear here once uploaded.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: tokens.colors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Center(
-            child: Semantics(
-              button: true,
-              label: 'Upload your first PDF',
-              child: FilledButton.icon(
-                key: const Key('library-empty-upload-cta'),
-                onPressed: onUploadTap,
-                icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Upload PDF'),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                0,
+                horizontalPadding,
+                AppSpacing.x3l,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            decoration: BoxDecoration(
+                              color: tokens.colors.surfaceSecondary,
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(20),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.note_add_outlined,
+                              size: 44,
+                              color: tokens.colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: tokens.colors.textTertiary.withAlpha(180),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 6,
+                          top: 50,
+                          child: Container(
+                            width: 4,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: tokens.colors.textTertiary.withAlpha(120),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x2l),
+                  Text(
+                    'No documents yet',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: tokens.colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: Text(
+                      'Upload your first PDF to start asking questions and extracting insights with absolute security.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: tokens.colors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x2l),
+                  Center(
+                    child: Semantics(
+                      button: true,
+                      label: 'Upload PDF',
+                      child: FilledButton(
+                        key: const Key('library-empty-upload-cta'),
+                        onPressed: onUploadTap,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.x2l,
+                            vertical: AppSpacing.lg,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.upload_file_outlined, size: 20),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              'Upload PDF',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Text(
+                    'Supported formats: PDF, DOCX (Max 50MB)',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: tokens.colors.textTertiary,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  if (isSearching) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    TextButton(
+                      key: const Key('library-close-search'),
+                      onPressed: onCloseSearch,
+                      child: const Text('Cancel search'),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-          if (isSearching)
-            Center(
-              child: TextButton(
-                key: const Key('library-close-search'),
-                onPressed: onCloseSearch,
-                child: const Text('Cancel search'),
-              ),
-            ),
         ],
       );
     }
