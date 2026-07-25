@@ -24,6 +24,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _passwordError;
   String? _formError;
 
+  bool _obscurePassword = true;
+
   @override
   void initState() {
     super.initState();
@@ -93,18 +95,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   InputDecoration _authInputDecoration(
     BuildContext context, {
-    required String label,
+    String? hintText,
     String? errorText,
+    Widget? prefixIcon,
   }) {
-    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    final theme = Theme.of(context);
+    final tokens = theme.extension<DocuMindTokens>()!;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide(color: tokens.colors.borderDefault),
     );
 
     return InputDecoration(
-      labelText: label,
+      hintText: hintText,
+      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: tokens.colors.textSecondary.withAlpha(120),
+      ),
       errorText: errorText,
+      prefixIcon: prefixIcon,
+      prefixIconColor: tokens.colors.textSecondary,
       filled: true,
       fillColor: Color.alphaBlend(
         tokens.colors.surfaceInput.withAlpha(230),
@@ -303,12 +312,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _passwordController.text.length >= 12 &&
         !isLoading;
 
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      color: tokens.colors.textSecondary,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.8,
+    );
+
     return AuthBrandedScaffold(
       title: 'Welcome back',
-      subtitle: 'Log in to continue to your document library.',
+      subtitle: 'Log in to continue to your document library',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text('EMAIL', style: labelStyle),
+          const SizedBox(height: AppSpacing.xs),
           AccessibilityFocusRing(
             borderRadius: 14,
             padding: const EdgeInsets.all(2),
@@ -319,24 +336,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onChanged: _validateEmail,
               decoration: _authInputDecoration(
                 context,
-                label: 'Email',
+                hintText: 'name@company.com',
+                prefixIcon: const Icon(Icons.mail_outline, size: 20),
                 errorText: _emailError,
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Text('PASSWORD', style: labelStyle),
+              const Spacer(),
+              TextButton(
+                onPressed: isLoading ? null : _showForgotPasswordSheet,
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Forgot password?',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: tokens.colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
           AccessibilityFocusRing(
             borderRadius: 14,
             padding: const EdgeInsets.all(2),
             child: TextField(
               key: const Key('login-password-field'),
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               onChanged: _validatePassword,
               decoration: _authInputDecoration(
                 context,
-                label: 'Password',
+                hintText: '••••••••',
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
                 errorText: _passwordError,
+              ).copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: tokens.colors.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
             ),
           ),
@@ -349,9 +403,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x2l),
           SizedBox(
-            height: 44,
+            height: 48,
             child: ElevatedButton(
               key: const Key('login-submit-button'),
               onPressed: canSubmit ? _submit : null,
@@ -362,23 +416,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Login'),
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Login to Library'),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Icon(Icons.arrow_forward, size: 20),
+                      ],
+                    ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: 44,
-            child: TextButton(
-              onPressed: isLoading ? null : _showForgotPasswordSheet,
-              child: const Text('Forgot password?'),
-            ),
-          ),
-          SizedBox(
-            height: 44,
-            child: TextButton(
-              onPressed: isLoading ? null : () => context.go('/auth/signup'),
-              child: const Text('Create an account'),
-            ),
+          const SizedBox(height: AppSpacing.x2l),
+          Divider(height: 1, color: tokens.colors.borderDefault.withAlpha(100)),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              Text(
+                "Don't have an account? ",
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.colors.textSecondary,
+                ),
+              ),
+              InkWell(
+                onTap: isLoading ? null : () => context.go('/auth/signup'),
+                child: Text(
+                  'Create an account',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: tokens.colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

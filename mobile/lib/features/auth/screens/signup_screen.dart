@@ -17,15 +17,21 @@ class SignupScreen extends ConsumerStatefulWidget {
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   String? _emailError;
   String? _passwordError;
+  String? _confirmPasswordError;
   String? _formError;
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -41,6 +47,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _passwordError = value.length >= 12
           ? null
           : 'Password must be at least 12 characters';
+      if (_confirmPasswordController.text.isNotEmpty) {
+        _validateConfirmPassword(_confirmPasswordController.text);
+      }
+      _formError = null;
+    });
+  }
+
+  void _validateConfirmPassword(String value) {
+    setState(() {
+      _confirmPasswordError = value == _passwordController.text
+          ? null
+          : 'Passwords do not match';
       _formError = null;
     });
   }
@@ -52,18 +70,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   InputDecoration _authInputDecoration(
     BuildContext context, {
-    required String label,
+    String? hintText,
     String? errorText,
+    Widget? prefixIcon,
   }) {
-    final tokens = Theme.of(context).extension<DocuMindTokens>()!;
+    final theme = Theme.of(context);
+    final tokens = theme.extension<DocuMindTokens>()!;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide(color: tokens.colors.borderDefault),
     );
 
     return InputDecoration(
-      labelText: label,
+      hintText: hintText,
+      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: tokens.colors.textSecondary.withAlpha(120),
+      ),
       errorText: errorText,
+      prefixIcon: prefixIcon,
+      prefixIconColor: tokens.colors.textSecondary,
       filled: true,
       fillColor: Color.alphaBlend(
         tokens.colors.surfaceInput.withAlpha(230),
@@ -122,7 +147,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Future<void> _submit() async {
     _validateEmail(_emailController.text.trim());
     _validatePassword(_passwordController.text);
-    if (_emailError != null || _passwordError != null) {
+    _validateConfirmPassword(_confirmPasswordController.text);
+    if (_emailError != null || _passwordError != null || _confirmPasswordError != null) {
       return;
     }
 
@@ -158,14 +184,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final canSubmit =
         _isValidEmail(_emailController.text.trim()) &&
         _passwordController.text.length >= 12 &&
+        _confirmPasswordController.text == _passwordController.text &&
         !isLoading;
+
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      color: tokens.colors.textSecondary,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.8,
+    );
 
     return AuthBrandedScaffold(
       title: 'Create your account',
-      subtitle: 'Sign up to start uploading and chatting with your docs.',
+      subtitle: 'Sign up to start uploading and chatting with your docs',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text('EMAIL', style: labelStyle),
+          const SizedBox(height: AppSpacing.xs),
           AccessibilityFocusRing(
             borderRadius: 14,
             padding: const EdgeInsets.all(2),
@@ -176,24 +211,73 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               onChanged: _validateEmail,
               decoration: _authInputDecoration(
                 context,
-                label: 'Email',
+                hintText: 'name@company.com',
+                prefixIcon: const Icon(Icons.mail_outline, size: 20),
                 errorText: _emailError,
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          Text('PASSWORD', style: labelStyle),
+          const SizedBox(height: AppSpacing.xs),
           AccessibilityFocusRing(
             borderRadius: 14,
             padding: const EdgeInsets.all(2),
             child: TextField(
               key: const Key('signup-password-field'),
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               onChanged: _validatePassword,
               decoration: _authInputDecoration(
                 context,
-                label: 'Password',
+                hintText: '••••••••',
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
                 errorText: _passwordError,
+              ).copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: tokens.colors.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('CONFIRM PASSWORD', style: labelStyle),
+          const SizedBox(height: AppSpacing.xs),
+          AccessibilityFocusRing(
+            borderRadius: 14,
+            padding: const EdgeInsets.all(2),
+            child: TextField(
+              key: const Key('signup-confirm-password-field'),
+              controller: _confirmPasswordController,
+              obscureText: _obscureConfirmPassword,
+              onChanged: _validateConfirmPassword,
+              decoration: _authInputDecoration(
+                context,
+                hintText: '••••••••',
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                errorText: _confirmPasswordError,
+              ).copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: tokens.colors.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                ),
               ),
             ),
           ),
@@ -206,9 +290,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.x2l),
           SizedBox(
-            height: 44,
+            height: 48,
             child: ElevatedButton(
               key: const Key('signup-submit-button'),
               onPressed: canSubmit ? _submit : null,
@@ -219,16 +303,39 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Sign Up'),
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Create Account'),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Icon(Icons.arrow_forward, size: 20),
+                      ],
+                    ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: 44,
-            child: TextButton(
-              onPressed: isLoading ? null : () => context.go('/auth/login'),
-              child: const Text('Already have an account? Log in'),
-            ),
+          const SizedBox(height: AppSpacing.x2l),
+          Divider(height: 1, color: tokens.colors.borderDefault.withAlpha(100)),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              Text(
+                'Already have an account? ',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.colors.textSecondary,
+                ),
+              ),
+              InkWell(
+                onTap: isLoading ? null : () => context.go('/auth/login'),
+                child: Text(
+                  'Log in',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: tokens.colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

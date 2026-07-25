@@ -75,69 +75,149 @@ class AuthBrandedScaffold extends StatelessWidget {
                 ),
               ),
             ),
-            Center(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.x2l,
-                  AppSpacing.xl,
-                  AppSpacing.xl + MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _AuthWordmark(),
-                      const SizedBox(height: AppSpacing.xl),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Color.alphaBlend(
-                                tokens.colors.surfaceSecondary.withAlpha(140),
-                                tokens.colors.surfacePrimary,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: tokens.colors.borderDefault.withAlpha(
-                                  180,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Center(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  AppSpacing.xl,
+                                  AppSpacing.x2l,
+                                  AppSpacing.xl,
+                                  AppSpacing.xl,
+                                ),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 420),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const _AuthWordmark(),
+                                      const SizedBox(height: AppSpacing.x2l),
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: tokens.colors.surfaceSecondary.withAlpha(140),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: tokens.colors.borderDefault.withAlpha(150),
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(AppSpacing.x2l),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                title,
+                                                style: theme.textTheme.headlineMedium
+                                                    ?.copyWith(
+                                                      color: tokens.colors.textPrimary,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: AppSpacing.sm),
+                                              Text(
+                                                subtitle,
+                                                textAlign: TextAlign.center,
+                                                style: theme.textTheme.bodyLarge?.copyWith(
+                                                  color: tokens.colors.textSecondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: AppSpacing.x2l),
+                                              child,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.x3l),
+                                      Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.security_outlined,
+                                            size: 16,
+                                            color: tokens.colors.textSecondary,
+                                          ),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          Text(
+                                            'End-to-End Encrypted Data Processing',
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: tokens.colors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.xl),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    title,
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(
-                                          color: tokens.colors.textPrimary,
-                                        ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    subtitle,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: tokens.colors.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xl),
-                                  child,
-                                ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.xl,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(
+                                  color: tokens.colors.borderDefault.withAlpha(100),
+                                ),
                               ),
                             ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  '© 2026 DocuMind AI. Secure Intelligence.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: tokens.colors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: AppSpacing.lg,
+                                  runSpacing: AppSpacing.sm,
+                                  children: [
+                                    Text(
+                                      'Privacy Policy',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: tokens.colors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Terms of Service',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: tokens.colors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Security Architecture',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: tokens.colors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -157,23 +237,21 @@ class _AuthWordmark extends StatelessWidget {
     return Semantics(
       label: 'DocuMind AI brand header',
       container: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
+          Icon(
+            Icons.shield,
+            color: tokens.colors.accentCitation,
+            size: 28,
+          ),
+          const SizedBox(width: AppSpacing.sm),
           Text(
             'DocuMind AI',
             style: theme.textTheme.headlineSmall?.copyWith(
               color: tokens.colors.textPrimary,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Read smarter. Decide faster.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: tokens.colors.accentCitation,
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
