@@ -40,6 +40,7 @@ class _DocuMindRoot extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'DocuMind AI',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
