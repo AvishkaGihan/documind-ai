@@ -82,41 +82,44 @@ class AppColorPalette {
 class AppColors {
   const AppColors._();
 
+  // ── Dark palette ─ inspired by the drone camera image ──
+  // Deep charcoal surfaces with bold orange-red & metallic silver accents.
   static const AppColorPalette dark = AppColorPalette(
-    surfacePrimary: Color(0xFF0D1117),
-    surfaceSecondary: Color(0xFF161B22),
-    surfaceTertiary: Color(0xFF21262D),
-    surfaceInput: Color(0xFF0D1117),
-    borderDefault: Color(0xFF30363D),
-    borderEmphasis: Color(0xFF484F58),
-    accentPrimary: Color(0xFF58A6FF),
-    accentSecondary: Color(0xFF3FB950),
-    accentCitation: Color(0xFFD2A8FF),
-    accentWarning: Color(0xFFD29922),
-    accentError: Color(0xFFF85149),
-    accentAiGlow: Color(0xFF79C0FF),
-    textPrimary: Color(0xFFF0F6FC),
-    textSecondary: Color(0xFF8B949E),
-    textTertiary: Color(0xFF6E7681),
+    surfacePrimary: Color(0xFF121212),    // deep charcoal (camera body)
+    surfaceSecondary: Color(0xFF1C1C1E),  // gunmetal dark layer
+    surfaceTertiary: Color(0xFF2C2C2E),   // elevated metallic surface
+    surfaceInput: Color(0xFF161618),      // near-black input field
+    borderDefault: Color(0xFF3A3A3C),     // brushed metal border
+    borderEmphasis: Color(0xFF5A5A5E),    // polished metal focus ring
+    accentPrimary: Color(0xFFFF5B2E),     // bold orange-red (background gradient)
+    accentSecondary: Color(0xFF8E9AAB),   // cool metallic silver-blue
+    accentCitation: Color(0xFFFF9A76),    // soft warm coral
+    accentWarning: Color(0xFFFFAB40),     // amber-gold
+    accentError: Color(0xFFFF3B30),       // vivid red (lens accent)
+    accentAiGlow: Color(0xFFFF6D00),      // vibrant orange glow
+    textPrimary: Color(0xFFF2F2F7),       // bright silver-white
+    textSecondary: Color(0xFF98989D),     // brushed aluminium grey
+    textTertiary: Color(0xFF636366),      // muted steel grey
     textOnAccent: Color(0xFFFFFFFF),
   );
 
+  // ── Light palette ─ clean white/silver surfaces, same accent system ──
   static const AppColorPalette light = AppColorPalette(
-    surfacePrimary: Color(0xFFFFFFFF),
-    surfaceSecondary: Color(0xFFF6F8FA),
-    surfaceTertiary: Color(0xFFF6F8FA),
-    surfaceInput: Color(0xFFFFFFFF),
-    borderDefault: Color(0xFF30363D),
-    borderEmphasis: Color(0xFF484F58),
-    accentPrimary: Color(0xFF58A6FF),
-    accentSecondary: Color(0xFF3FB950),
-    accentCitation: Color(0xFFD2A8FF),
-    accentWarning: Color(0xFFD29922),
-    accentError: Color(0xFFF85149),
-    accentAiGlow: Color(0xFF79C0FF),
-    textPrimary: Color(0xFF1F2328),
-    textSecondary: Color(0xFF656D76),
-    textTertiary: Color(0xFF656D76),
+    surfacePrimary: Color(0xFFFAFAFA),    // clean white (image bg)
+    surfaceSecondary: Color(0xFFF0F0F2),  // light aluminium grey
+    surfaceTertiary: Color(0xFFE5E5EA),   // slightly deeper silver
+    surfaceInput: Color(0xFFFFFFFF),      // pure white inputs
+    borderDefault: Color(0xFFD1D1D6),     // soft metallic border
+    borderEmphasis: Color(0xFFA0A0A8),    // polished silver focus
+    accentPrimary: Color(0xFFE04820),     // deeper orange for light contrast
+    accentSecondary: Color(0xFF6B7685),   // steel grey-blue
+    accentCitation: Color(0xFFD4643B),    // muted warm coral
+    accentWarning: Color(0xFFE88A00),     // deep amber
+    accentError: Color(0xFFD42020),       // strong red
+    accentAiGlow: Color(0xFFE05500),      // deep orange glow
+    textPrimary: Color(0xFF1C1C1E),       // near-black (camera body tone)
+    textSecondary: Color(0xFF48484A),     // dark steel grey
+    textTertiary: Color(0xFF6C6C70),      // mid steel grey
     textOnAccent: Color(0xFFFFFFFF),
   );
 }
