@@ -10,6 +10,7 @@ class ChatInputBar extends StatefulWidget {
     required this.onSend,
     required this.isSending,
     this.enabled = true,
+    this.hintText,
     super.key,
   });
 
@@ -18,6 +19,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback onSend;
   final bool isSending;
   final bool enabled;
+  final String? hintText;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -160,7 +162,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                           height: 1.4,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Ask this document a question…',
+                          hintText: widget.hintText ?? 'Ask this document a question…',
                           hintStyle: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 15,

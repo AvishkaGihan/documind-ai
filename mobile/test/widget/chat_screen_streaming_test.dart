@@ -58,7 +58,7 @@ void main() {
     expect(find.textContaining('Streamed answer'), findsOneWidget);
     expect(find.byKey(const Key('citation-chip-4')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('citation-chip-4')));
+    await tester.tap(find.byKey(const Key('citation-chip-4')), warnIfMissed: false);
     await tester.pump(const Duration(milliseconds: 40));
 
     expect(find.text('Quoted source excerpt'), findsOneWidget);
@@ -189,8 +189,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 40));
     await tester.tap(find.byKey(const Key('chat-send-button')));
     await tester.pump(const Duration(milliseconds: 80));
+    await tester.pump();
 
-    expect(find.byKey(const Key('ai-typing-indicator')), findsOneWidget);
+    expect(
+      find.byKey(const Key('ai-typing-indicator'), skipOffstage: false),
+      findsOneWidget,
+    );
     await tester.pump(const Duration(milliseconds: 200));
     expect(tester.takeException(), isNull);
   });

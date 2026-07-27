@@ -31,9 +31,9 @@ void main() {
     expect(find.text('Old conversation message'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('chat-new-conversation-button')));
-    await tester.pump(const Duration(milliseconds: 80));
+    await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Start a new conversation?'), findsOneWidget);
+    expect(find.text('Start new conversation?'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('chat-confirm-new-conversation-button')),

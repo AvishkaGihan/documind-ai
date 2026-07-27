@@ -160,8 +160,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       );
     }
 
-    final title = chatState.documentTitle.isEmpty
-        ? 'Chat'
+    final title = (chatState.documentId == null || chatState.documentTitle.isEmpty)
+        ? 'Select Document'
         : chatState.documentTitle;
 
     return Scaffold(
@@ -387,7 +387,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ref.read(chatControllerProvider.notifier).send(question);
           },
           isSending: chatState.isStreaming,
-          enabled: !chatState.isRateLimited,
+          enabled: chatState.documentId != null && !chatState.isRateLimited,
+          hintText: chatState.documentId == null
+              ? 'Select a document to ask questions'
+              : null,
         ),
       ],
     );
@@ -516,6 +519,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
                 return SafeArea(
                   child: Column(
+                    key: const Key('chat-document-selector-sheet'),
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Handle bar
@@ -828,6 +832,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final theme = Theme.of(context);
     final tokens = theme.extension<DocuMindTokens>()!;
+
+    // ── No document selected ──────────────────────────────────────────────
+    if (chatState.documentId == null) {
+      return ChatEmptyState(
+        documentTitle: chatState.documentTitle,
+        onSelectDocument: _openDocumentSelector,
+      );
+    }
 
     // ── Document still processing ────────────────────────────────────────
     if (!chatState.isDocumentReady) {

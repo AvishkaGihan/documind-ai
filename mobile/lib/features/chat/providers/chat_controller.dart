@@ -5,6 +5,8 @@ import 'package:documind_ai/core/networking/connectivity_provider.dart';
 import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:documind_ai/features/chat/data/chat_api.dart';
 import 'package:documind_ai/features/chat/models/chat_models.dart';
+import 'package:documind_ai/features/library/models/document_upload_models.dart';
+import 'package:documind_ai/features/library/providers/document_list_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -166,6 +168,45 @@ class ChatController extends Notifier<ChatState> {
     final cache = ref.read(localCacheStoreProvider);
     final isOnline = ref.read(connectivityServiceProvider).isOnline;
 
+    if (documentId == 'active' || documentId.trim().isEmpty) {
+      var documentListState = ref.read(documentListProvider);
+      var docsResponse = documentListState.documents.asData?.value;
+      if (docsResponse == null) {
+        await ref.read(documentListProvider.notifier).refreshQuietly();
+        documentListState = ref.read(documentListProvider);
+        docsResponse = documentListState.documents.asData?.value;
+      }
+
+      final readyDoc = docsResponse?.items.cast<UploadedDocument?>().firstWhere(
+        (doc) => doc?.status == 'ready',
+        orElse: () => null,
+      );
+
+      if (readyDoc != null) {
+        await load(readyDoc.id);
+        return;
+      }
+
+      state = state.copyWith(
+        documentId: null,
+        documentTitle: 'No Document Selected',
+        messages: const <ChatMessage>[],
+        inputDraft: '',
+        isLoading: false,
+        isStreaming: false,
+        clearInFlightAnswerId: true,
+        citationExcerpts: const <int, String>{},
+        expandedCitationPages: const <int>{},
+        clearErrorMessage: true,
+        clearWarningMessage: true,
+        clearRateLimitResetAt: true,
+        clearLastFailedQuestion: true,
+        clearAnnouncement: true,
+        isDocumentReady: false,
+      );
+      return;
+    }
+
     state = state.copyWith(
       documentId: documentId,
       messages: const <ChatMessage>[],
@@ -219,7 +260,25 @@ class ChatController extends Notifier<ChatState> {
       );
       await _flushQueuedQuestions(documentId);
     } on ChatApiError catch (error) {
-      if (_isNetworkStyleError(error)) {
+      if (_isInvalidOrNotFoundDocumentError(error)) {
+        state = state.copyWith(
+          documentId: null,
+          documentTitle: 'No Document Selected',
+          messages: const <ChatMessage>[],
+          inputDraft: '',
+          isLoading: false,
+          isStreaming: false,
+          clearInFlightAnswerId: true,
+          citationExcerpts: const <int, String>{},
+          expandedCitationPages: const <int>{},
+          clearErrorMessage: true,
+          clearWarningMessage: true,
+          clearRateLimitResetAt: true,
+          clearLastFailedQuestion: true,
+          clearAnnouncement: true,
+          isDocumentReady: false,
+        );
+      } else if (_isNetworkStyleError(error)) {
         final cachedMessages = await cache.readChatMessages(
           userNamespace: namespace,
           documentId: documentId,
@@ -238,7 +297,23 @@ class ChatController extends Notifier<ChatState> {
           isDocumentReady: error.code != 'DOCUMENT_NOT_READY',
         );
       }
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to load document.',
+      );
     }
+  }
+
+  bool _isInvalidOrNotFoundDocumentError(ChatApiError error) {
+    final code = error.code.toUpperCase();
+    return code == 'INVALID_REQUEST_PAYLOAD' ||
+        code == 'DOCUMENT_NOT_FOUND' ||
+        code == 'HTTP_400' ||
+        code == 'HTTP_422' ||
+        code == '400' ||
+        code == '404' ||
+        code == '422';
   }
 
   Future<void> startNewConversation() async {

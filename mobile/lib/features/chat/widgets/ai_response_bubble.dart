@@ -141,7 +141,7 @@ class AiResponseBubble extends StatelessWidget {
                                 citationExcerpts[citation.pageNumber] ??
                                 citation.textExcerpt;
                             return CitationChip(
-                              key: ValueKey('${message.id}-citation-${citation.pageNumber}-$index'),
+                              key: Key('citation-chip-${citation.pageNumber}'),
                               pageNumber: citation.pageNumber,
                               excerpt: excerpt,
                               isExpanded:

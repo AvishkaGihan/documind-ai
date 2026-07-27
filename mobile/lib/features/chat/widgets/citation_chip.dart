@@ -79,7 +79,7 @@ class _CitationChipState extends State<CitationChip>
             button: true,
             toggled: widget.isExpanded,
             label:
-                'Source citation, page ${widget.pageNumber}. ${widget.isExpanded ? 'Tap to collapse.' : 'Tap to view excerpt.'}',
+                'Page reference, page ${widget.pageNumber}. ${widget.isExpanded ? 'Tap to collapse.' : 'Tap to view source.'}',
             child: AccessibilityFocusRing(
               borderRadius: 20,
               child: GestureDetector(

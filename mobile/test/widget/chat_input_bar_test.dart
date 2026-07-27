@@ -30,8 +30,10 @@ void main() {
       final sendButton = find.byKey(const Key('chat-send-button'));
       expect(sendButton, findsOneWidget);
 
-      final disabledButton = tester.widget<IconButton>(sendButton);
-      expect(disabledButton.onPressed, isNull);
+      final disabledGesture = tester.widget<GestureDetector>(
+        find.ancestor(of: sendButton, matching: find.byType(GestureDetector)),
+      );
+      expect(disabledGesture.onTap, isNull);
 
       await tester.enterText(
         find.byKey(const Key('chat-input-text-field')),
@@ -39,8 +41,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 40));
 
-      final enabledButton = tester.widget<IconButton>(sendButton);
-      expect(enabledButton.onPressed, isNotNull);
+      final enabledGesture = tester.widget<GestureDetector>(
+        find.ancestor(of: sendButton, matching: find.byType(GestureDetector)),
+      );
+      expect(enabledGesture.onTap, isNotNull);
 
       await tester.tap(sendButton);
       await tester.pump(const Duration(milliseconds: 20));
@@ -74,10 +78,13 @@ void main() {
     );
     expect(textField.enabled, isFalse);
 
-    final sendButton = tester.widget<IconButton>(
-      find.byKey(const Key('chat-send-button')),
+    final sendGesture = tester.widget<GestureDetector>(
+      find.ancestor(
+        of: find.byKey(const Key('chat-send-button')),
+        matching: find.byType(GestureDetector),
+      ),
     );
-    expect(sendButton.onPressed, isNull);
+    expect(sendGesture.onTap, isNull);
   });
 
   testWidgets('send button exposes required semantics label', (

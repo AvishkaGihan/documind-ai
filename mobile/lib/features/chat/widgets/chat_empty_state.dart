@@ -7,12 +7,14 @@ import 'package:flutter/material.dart';
 class ChatEmptyState extends StatefulWidget {
   const ChatEmptyState({
     required this.documentTitle,
-    required this.onSuggestionTap,
+    this.onSuggestionTap,
+    this.onSelectDocument,
     super.key,
   });
 
   final String documentTitle;
-  final ValueChanged<String> onSuggestionTap;
+  final ValueChanged<String>? onSuggestionTap;
+  final VoidCallback? onSelectDocument;
 
   @override
   State<ChatEmptyState> createState() => _ChatEmptyStateState();
@@ -207,8 +209,10 @@ class _ChatEmptyStateState extends State<ChatEmptyState>
 
               // ── Document title ────────────────────────────────────────
               Text(
-                widget.documentTitle.isEmpty
-                    ? 'Your Document'
+                widget.onSelectDocument != null ||
+                        widget.documentTitle.isEmpty ||
+                        widget.documentTitle == 'No Document Selected'
+                    ? 'No Document Selected'
                     : widget.documentTitle,
                 style: theme.textTheme.titleLarge?.copyWith(
                   color: tokens.colors.textPrimary,
@@ -223,7 +227,10 @@ class _ChatEmptyStateState extends State<ChatEmptyState>
               const SizedBox(height: AppSpacing.xs),
 
               Text(
-                'Ask anything about this document',
+                widget.onSelectDocument != null ||
+                        widget.documentTitle == 'No Document Selected'
+                    ? 'Select a document from your library to start asking questions.'
+                    : 'Ask anything about this document',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: tokens.colors.textTertiary,
                   fontStyle: FontStyle.italic,
@@ -233,19 +240,28 @@ class _ChatEmptyStateState extends State<ChatEmptyState>
 
               const SizedBox(height: AppSpacing.xl),
 
-              // ── Suggestion chips ──────────────────────────────────────
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: _suggestions.map((suggestion) {
-                  return _SuggestionChip(
-                    text: suggestion,
-                    tokens: tokens,
-                    onTap: () => widget.onSuggestionTap(suggestion),
-                  );
-                }).toList(growable: false),
-              ),
+              if (widget.onSelectDocument != null) ...[
+                FilledButton.icon(
+                  key: const Key('chat-select-document-button'),
+                  onPressed: widget.onSelectDocument,
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('Select Document'),
+                ),
+              ] else if (widget.onSuggestionTap != null) ...[
+                // ── Suggestion chips ──────────────────────────────────────
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: _suggestions.map((suggestion) {
+                    return _SuggestionChip(
+                      text: suggestion,
+                      tokens: tokens,
+                      onTap: () => widget.onSuggestionTap?.call(suggestion),
+                    );
+                  }).toList(growable: false),
+                ),
+              ],
             ],
           ),
         ),
@@ -317,14 +333,16 @@ class _SuggestionChipState extends State<_SuggestionChip> {
                 color: colors.accentPrimary.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 6),
-              Text(
-                widget.text,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: colors.textSecondary,
-                  height: 1.2,
+              Flexible(
+                child: Text(
+                  widget.text,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: colors.textSecondary,
+                    height: 1.2,
+                  ),
                 ),
               ),
             ],
