@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:documind_ai/core/networking/connectivity_provider.dart';
 import 'package:documind_ai/core/storage/local_cache_store.dart';
 import 'package:documind_ai/features/library/data/documents_api.dart';
@@ -74,6 +76,89 @@ class DocumentListNotifier extends Notifier<DocumentListState> {
       announcement: announcement,
     );
     _updateStatusSnapshotFromCurrentState();
+  }
+
+  Future<void> refreshQuietly() async {
+    final previousStatuses = _lastStatusesByDocumentId;
+    final nextDocuments = await AsyncValue.guard(_loadDocuments);
+    if (!ref.mounted) {
+      return;
+    }
+    final nextStatuses = nextDocuments.maybeWhen(
+      data: _indexStatuses,
+      orElse: () => previousStatuses,
+    );
+
+    final announcement = _buildTransitionAnnouncement(
+      previousStatuses,
+      nextStatuses,
+      nextDocuments,
+    );
+
+    state = state.copyWith(
+      documents: nextDocuments,
+      announcement: announcement,
+    );
+    _updateStatusSnapshotFromCurrentState();
+  }
+
+  void updateDocument(UploadedDocument updatedDoc) {
+    final currentDocs = state.documents;
+    final currentData = currentDocs.asData?.value;
+
+    final List<UploadedDocument> items;
+    final int total;
+
+    if (currentData != null) {
+      final index = currentData.items.indexWhere((d) => d.id == updatedDoc.id);
+      if (index >= 0) {
+        items = List<UploadedDocument>.from(currentData.items);
+        items[index] = updatedDoc;
+        total = currentData.total;
+      } else {
+        items = [updatedDoc, ...currentData.items];
+        total = currentData.total + 1;
+      }
+    } else {
+      items = [updatedDoc];
+      total = 1;
+    }
+
+    final newResponse = DocumentListResponse(
+      items: items,
+      total: total,
+      page: currentData?.page ?? _defaultPage,
+      pageSize: currentData?.pageSize ?? _defaultPageSize,
+    );
+
+    final previousStatuses = _lastStatusesByDocumentId;
+    final nextStatuses = _indexStatuses(newResponse);
+    final nextDocuments = AsyncValue.data(newResponse);
+
+    final announcement = _buildTransitionAnnouncement(
+      previousStatuses,
+      nextStatuses,
+      nextDocuments,
+    );
+
+    state = state.copyWith(
+      documents: nextDocuments,
+      announcement: announcement,
+    );
+    _updateStatusSnapshotFromCurrentState();
+
+    unawaited(_cacheResponse(newResponse));
+  }
+
+  Future<void> _cacheResponse(DocumentListResponse response) async {
+    try {
+      final cache = ref.read(localCacheStoreProvider);
+      final namespace = await resolveUserCacheNamespace(ref);
+      await cache.cacheDocumentList(
+        userNamespace: namespace,
+        response: response,
+      );
+    } catch (_) {}
   }
 
   void clearAnnouncement() {

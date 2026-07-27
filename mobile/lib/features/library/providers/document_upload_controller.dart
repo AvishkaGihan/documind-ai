@@ -96,9 +96,9 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
       );
       if (ref.mounted) {
         try {
-          await ref.read(documentListProvider.notifier).refresh();
+          ref.read(documentListProvider.notifier).updateDocument(uploaded);
         } catch (_) {
-          // Keep upload success state even if list refresh fails.
+          // Keep upload success state even if list update fails.
         }
       }
       _startPolling(uploaded.id);
@@ -253,9 +253,18 @@ class DocumentUploadController extends Notifier<DocumentUploadState> {
             : null,
       );
 
+      try {
+        ref.read(documentListProvider.notifier).updateDocument(latest);
+      } catch (_) {
+        // Keep polling even if list update fails.
+      }
+
       if (nextPhase == UploadCardPhase.ready ||
           nextPhase == UploadCardPhase.processingError) {
         _stopPolling();
+        try {
+          unawaited(ref.read(documentListProvider.notifier).refreshQuietly());
+        } catch (_) {}
       }
     } on LibraryApiError {
       // Keep current UI state and continue polling on transient failures.

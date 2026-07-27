@@ -154,6 +154,62 @@ void main() {
     final state = container.read(documentListProvider);
     expect(state.announcement, 'Document Contract Review is now ready');
   });
+
+  test('updateDocument updates document status in memory and triggers announcement', () async {
+    final fakeApi = _FakeDocumentsApi(
+      getDocumentsHandler: ({required page, required pageSize}) async {
+        return DocumentListResponse(
+          items: [
+            UploadedDocument(
+              id: 'doc-update',
+              title: 'Test Doc',
+              fileSize: 1024,
+              pageCount: 1,
+              status: 'extracting',
+              errorMessage: null,
+              createdAt: DateTime.utc(2026, 3, 19),
+            ),
+          ],
+          total: 1,
+          page: page,
+          pageSize: pageSize,
+        );
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        documentsApiProvider.overrideWithValue(fakeApi),
+        localCacheStoreProvider.overrideWithValue(_FakeLocalCacheStore()),
+        connectivityServiceProvider.overrideWithValue(
+          _FakeConnectivityService(initialOnline: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await waitForDocuments(container);
+    expect(
+      container.read(documentListProvider).documents.requireValue.items.single.status,
+      'extracting',
+    );
+
+    container.read(documentListProvider.notifier).updateDocument(
+      UploadedDocument(
+        id: 'doc-update',
+        title: 'Test Doc',
+        fileSize: 1024,
+        pageCount: 1,
+        status: 'ready',
+        errorMessage: null,
+        createdAt: DateTime.utc(2026, 3, 19),
+      ),
+    );
+
+    final updatedState = container.read(documentListProvider);
+    expect(updatedState.documents.requireValue.items.single.status, 'ready');
+    expect(updatedState.announcement, 'Document Test Doc is now ready');
+  });
 }
 
 typedef _GetDocumentsHandler =
