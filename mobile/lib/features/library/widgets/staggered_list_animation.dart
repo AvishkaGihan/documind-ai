@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// Wraps a single list item to provide a staggered slide-up + fade-in
@@ -30,6 +32,7 @@ class _StaggeredListItemState extends State<StaggeredListItem>
   AnimationController? _controller;
   Animation<double>? _fadeAnimation;
   Animation<Offset>? _slideAnimation;
+  Timer? _delayTimer;
   bool _hasPlayed = false;
 
   @override
@@ -38,6 +41,8 @@ class _StaggeredListItemState extends State<StaggeredListItem>
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     if (reduceMotion || _hasPlayed) {
+      _delayTimer?.cancel();
+      _delayTimer = null;
       _controller?.dispose();
       _controller = null;
       return;
@@ -66,17 +71,28 @@ class _StaggeredListItemState extends State<StaggeredListItem>
 
     // Schedule the delayed start
     final delay = widget.delayPerItem * widget.index;
-    Future<void>.delayed(delay, () {
+    _delayTimer?.cancel();
+    if (delay == Duration.zero) {
       if (mounted && _controller != null) {
         _controller!.forward().then((_) {
           _hasPlayed = true;
         });
       }
-    });
+    } else {
+      _delayTimer = Timer(delay, () {
+        if (mounted && _controller != null) {
+          _controller!.forward().then((_) {
+            _hasPlayed = true;
+          });
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
+    _delayTimer = null;
     _controller?.dispose();
     super.dispose();
   }

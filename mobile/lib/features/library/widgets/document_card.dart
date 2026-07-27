@@ -183,17 +183,14 @@ class _DocumentCardState extends State<DocumentCard>
     // Handle gestures and drive the press animation
     final interactiveCard = GestureDetector(
       onTapDown: (_) => _pressController.forward(),
-      onTapUp: (_) {
-        _pressController.reverse();
-        if (isReady && widget.onTap != null) {
-          widget.onTap!();
-        }
-      },
+      onTapUp: (_) => _pressController.reverse(),
       onTapCancel: () => _pressController.reverse(),
+      onTap: isReady && widget.onTap != null ? widget.onTap : null,
       onLongPress: () {
         _pressController.reverse();
         widget.onLongPress();
       },
+      behavior: HitTestBehavior.opaque,
       child: borderedCard,
     );
 
@@ -351,23 +348,43 @@ class _MetadataRow extends StatelessWidget {
     const iconSize = 12.0;
 
     return ExcludeSemantics(
-      child: Row(
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: 4,
         children: [
-          Icon(Icons.auto_stories_outlined, size: iconSize, color: iconColor),
-          const SizedBox(width: 3),
-          Text('${document.pageCount} pages', style: metaStyle),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_stories_outlined, size: iconSize, color: iconColor),
+              const SizedBox(width: 3),
+              Text('${document.pageCount} pages', style: metaStyle),
+            ],
+          ),
           _dot(tokens),
-          Icon(Icons.sd_storage_outlined, size: iconSize, color: iconColor),
-          const SizedBox(width: 3),
-          Text(_formatFileSize(document.fileSize), style: metaStyle),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sd_storage_outlined, size: iconSize, color: iconColor),
+              const SizedBox(width: 3),
+              Text(_formatFileSize(document.fileSize), style: metaStyle),
+            ],
+          ),
           _dot(tokens),
-          Icon(Icons.access_time_outlined, size: iconSize, color: iconColor),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
-              _formatRelativeTime(document.createdAt),
-              style: metaStyle,
-              overflow: TextOverflow.ellipsis,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.access_time_outlined, size: iconSize, color: iconColor),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    _formatRelativeTime(document.createdAt),
+                    style: metaStyle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

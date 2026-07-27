@@ -30,6 +30,7 @@ class LibraryScreen extends ConsumerStatefulWidget {
 class _LibraryScreenState extends ConsumerState<LibraryScreen>
     with WidgetsBindingObserver {
   String _searchQuery = '';
+  bool _isSearchVisible = false;
   LibrarySortMode _sortMode = LibrarySortMode.date;
   late final TextEditingController _searchController;
   late final ScrollController _scrollController;
@@ -170,6 +171,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               documents: visibleDocuments,
               allDocuments: response.items,
               searchQuery: searchQuery,
+              isSearchVisible: _isSearchVisible,
+              onToggleSearch: () {
+                setState(() {
+                  _isSearchVisible = !_isSearchVisible;
+                  if (!_isSearchVisible) {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  }
+                });
+              },
               onSearchQueryChanged: (value) {
                 setState(() {
                   _searchQuery = value;
@@ -223,6 +234,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             );
           },
           loading: () => CustomScrollView(
+            key: const Key('library-loading-skeleton-list'),
             slivers: [
               _buildSliverAppBar(tokens, theme, isLoading: true),
               SliverPadding(
@@ -348,6 +360,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final tokens = Theme.of(context).extension<DocuMindTokens>()!;
     final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
@@ -356,11 +370,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.md),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          child: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
                 children: [
                   // Drag handle
                   Center(
@@ -395,9 +408,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 ],
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
     );
 
     if (!context.mounted) {
@@ -535,6 +547,8 @@ class _LibraryContent extends StatelessWidget {
     required this.documents,
     required this.allDocuments,
     required this.searchQuery,
+    required this.isSearchVisible,
+    required this.onToggleSearch,
     required this.onSearchQueryChanged,
     required this.searchController,
     required this.onClearSearch,
@@ -554,6 +568,8 @@ class _LibraryContent extends StatelessWidget {
   final List<UploadedDocument> documents;
   final List<UploadedDocument> allDocuments;
   final String searchQuery;
+  final bool isSearchVisible;
+  final VoidCallback onToggleSearch;
   final ValueChanged<String> onSearchQueryChanged;
   final TextEditingController searchController;
   final VoidCallback onClearSearch;
@@ -611,32 +627,35 @@ class _LibraryContent extends StatelessWidget {
 
     // ── Content ──
     return CustomScrollView(
-      key: const Key('library-layout-list'),
+      key: widthClass.isTablet
+          ? const Key('library-layout-grid')
+          : const Key('library-layout-list'),
       controller: scrollController,
       slivers: [
         // ── SliverAppBar ──
         _buildHeroAppBar(context, tokens, theme),
 
         // ── Search field ──
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            AppSpacing.sm,
-            horizontalPadding,
-            0,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: StaggeredListItem(
-              index: 0,
-              child: _SearchField(
-                controller: searchController,
-                query: searchQuery,
-                onChanged: onSearchQueryChanged,
-                onClear: onClearSearch,
+        if (isSearchVisible || searchQuery.trim().isNotEmpty)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              AppSpacing.sm,
+              horizontalPadding,
+              0,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: StaggeredListItem(
+                index: 0,
+                child: _SearchField(
+                  controller: searchController,
+                  query: searchQuery,
+                  onChanged: onSearchQueryChanged,
+                  onClear: onClearSearch,
+                ),
               ),
             ),
           ),
-        ),
 
         // ── Stats row ──
         if (allDocuments.isNotEmpty)
@@ -669,6 +688,7 @@ class _LibraryContent extends StatelessWidget {
               child: StaggeredListItem(
                 index: 3,
                 child: DocumentUploadCard(
+                  key: const Key('document-upload-card'),
                   state: uploadState,
                   onRetry: onUploadRetry,
                   onReadyTap: onUploadReadyTap,
@@ -758,30 +778,47 @@ class _LibraryContent extends StatelessWidget {
           left: AppSpacing.xl,
           bottom: AppSpacing.lg,
         ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Your Library',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: tokens.colors.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-              ),
-            ),
-            if (allDocuments.isNotEmpty)
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.bottomLeft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                '${allDocuments.length} document${allDocuments.length == 1 ? '' : 's'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: tokens.colors.textTertiary,
-                  fontSize: 11,
+                'Your Library',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: tokens.colors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
                 ),
               ),
-          ],
+              if (allDocuments.isNotEmpty)
+                Text(
+                  '${allDocuments.length} document${allDocuments.length == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: tokens.colors.textTertiary,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       actions: [
+        Semantics(
+          button: true,
+          label: 'Search documents',
+          child: AccessibilityFocusRing(
+            borderRadius: 22,
+            child: IconButton(
+              key: const Key('library-search-button'),
+              tooltip: 'Search documents',
+              onPressed: onToggleSearch,
+              icon: const ExcludeSemantics(child: Icon(Icons.search_rounded)),
+            ),
+          ),
+        ),
         Semantics(
           button: true,
           label: 'Sort documents',
@@ -845,16 +882,17 @@ class _LibraryContent extends StatelessWidget {
         ),
         SliverFillRemaining(
           hasScrollBody: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              0,
-              horizontalPadding,
-              AppSpacing.x3l,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                AppSpacing.md,
+                horizontalPadding,
+                AppSpacing.x3l,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 // ── Floating documents animation ──
                 const FloatingDocumentsAnimation(),
 
@@ -862,7 +900,7 @@ class _LibraryContent extends StatelessWidget {
 
                 // ── Heading ──
                 Text(
-                  'Your library awaits',
+                  'Upload your first PDF',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: tokens.colors.textPrimary,
@@ -940,8 +978,9 @@ class _LibraryContent extends StatelessWidget {
             ),
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
   }
 
   SliverList _buildList(double itemSpacing) {
@@ -1048,6 +1087,7 @@ class _SwipeableDocumentCard extends StatelessWidget {
       child: Hero(
         tag: 'document-${document.id}',
         child: DocumentCard(
+          key: Key('document-card-${document.id}'),
           document: document,
           onTap: onTap,
           onLongPress: onLongPress,
@@ -1258,12 +1298,14 @@ class _GradientFabState extends State<_GradientFab>
             borderRadius: BorderRadius.circular(
               widget.isExtended ? 16 : 28,
             ),
-            child: InkWell(
-              key: const Key('library-upload-fab'),
-              onTap: widget.onPressed,
-              borderRadius: BorderRadius.circular(
-                widget.isExtended ? 16 : 28,
-              ),
+            child: Tooltip(
+              message: 'Upload PDF',
+              child: InkWell(
+                key: const Key('library-upload-fab'),
+                onTap: widget.onPressed,
+                borderRadius: BorderRadius.circular(
+                  widget.isExtended ? 16 : 28,
+                ),
               child: Ink(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1315,6 +1357,7 @@ class _GradientFabState extends State<_GradientFab>
             ),
           ),
         ),
+      ),
       ),
     );
 

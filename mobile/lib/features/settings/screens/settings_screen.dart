@@ -99,100 +99,102 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               ),
             ),
           ),
-
           // ── Body ──
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Profile header ──
-                _StaggeredEntry(
-                  animation: _headerAnim,
-                  child: _ProfileHeader(
-                    authState: authState,
-                    glowAnimation: _glowController,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                // ── Appearance section ──
-                _StaggeredEntry(
-                  animation: _themeAnim,
-                  child: _SectionCard(
-                    label: 'Appearance',
-                    child: _SegmentedThemeToggle(
-                      themeMode: themeMode,
-                      onDark: () =>
-                          ref.read(themeModeProvider.notifier).setDark(),
-                      onLight: () =>
-                          ref.read(themeModeProvider.notifier).setLight(),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Profile header ──
+                  _StaggeredEntry(
+                    animation: _headerAnim,
+                    child: _ProfileHeader(
+                      authState: authState,
+                      glowAnimation: _glowController,
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.sm),
 
-                // ── Security section ──
-                _StaggeredEntry(
-                  animation: _securityAnim,
-                  child: _SectionCard(
-                    label: 'Security',
-                    child: _ActionTile(
-                      key: const Key('settings-action-reset-password'),
-                      label: 'Reset Password',
-                      subtitle: 'Send a password reset email',
-                      icon: Icons.lock_reset_rounded,
-                      iconColor: tokens.colors.accentPrimary,
-                      semanticsLabel: 'Reset password',
-                      onTap: () => _handleResetPasswordTap(
-                        context: context,
-                        ref: ref,
-                        authState: authState,
-                        tokens: tokens,
+                  // ── Appearance section ──
+                  _StaggeredEntry(
+                    animation: _themeAnim,
+                    child: _SectionCard(
+                      label: 'Theme',
+                      child: _SegmentedThemeToggle(
+                        themeMode: themeMode,
+                        onDark: () =>
+                            ref.read(themeModeProvider.notifier).setDark(),
+                        onLight: () =>
+                            ref.read(themeModeProvider.notifier).setLight(),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.sm),
 
-                // ── Danger zone ──
-                _StaggeredEntry(
-                  animation: _dangerAnim,
-                  child: _DangerZoneCard(
-                    child: _ActionTile(
-                      key: const Key('settings-action-delete-account'),
-                      label: 'Delete Account',
-                      subtitle: 'Permanently remove all data',
-                      icon: Icons.delete_forever_rounded,
-                      iconColor: tokens.colors.accentError,
-                      semanticsLabel: 'Delete account',
-                      onTap: () => _showDeleteAccountDialog(
-                        context: context,
-                        ref: ref,
-                        tokens: tokens,
+                  // ── Security section ──
+                  _StaggeredEntry(
+                    animation: _securityAnim,
+                    child: _SectionCard(
+                      label: 'Security',
+                      child: _ActionTile(
+                        actionKey: const Key('settings-action-reset-password'),
+                        label: 'Reset Password',
+                        subtitle: 'Send a password reset email',
+                        icon: Icons.lock_reset_rounded,
+                        iconColor: tokens.colors.accentPrimary,
+                        semanticsLabel: 'Reset password',
+                        onTap: () => _handleResetPasswordTap(
+                          context: context,
+                          ref: ref,
+                          authState: authState,
+                          tokens: tokens,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.sm),
 
-                // ── Sign Out button ──
-                _StaggeredEntry(
-                  animation: _logoutAnim,
-                  child: _SignOutButton(
-                    onTap: () async {
-                      await ref.read(authStateProvider.notifier).logout();
-                    },
+                  // ── Danger zone ──
+                  _StaggeredEntry(
+                    animation: _dangerAnim,
+                    child: _DangerZoneCard(
+                      child: _ActionTile(
+                        actionKey: const Key('settings-action-delete-account'),
+                        label: 'Delete Account',
+                        subtitle: 'Permanently remove all data',
+                        icon: Icons.delete_forever_rounded,
+                        iconColor: tokens.colors.accentError,
+                        semanticsLabel: 'Delete account',
+                        onTap: () => _showDeleteAccountDialog(
+                          context: context,
+                          ref: ref,
+                          tokens: tokens,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.x3l),
+                  const SizedBox(height: AppSpacing.md),
 
-                // ── Footer ──
-                _StaggeredEntry(
-                  animation: _footerAnim,
-                  child: const _AppInfoFooter(),
-                ),
-                const SizedBox(height: AppSpacing.x2l),
-              ]),
+                  // ── Sign Out button ──
+                  _StaggeredEntry(
+                    animation: _logoutAnim,
+                    child: _SignOutButton(
+                      onTap: () async {
+                        await ref.read(authStateProvider.notifier).logout();
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // ── Footer ──
+                  _StaggeredEntry(
+                    animation: _footerAnim,
+                    child: const _AppInfoFooter(),
+                  ),
+                  const SizedBox(height: AppSpacing.x2l),
+                ],
+              ),
             ),
           ),
         ],
@@ -462,11 +464,15 @@ class _StaggeredEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) {
+      return child;
+    }
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
+        final val = animation.value.clamp(0.05, 1.0);
         return Opacity(
-          opacity: animation.value,
+          opacity: val,
           child: Transform.translate(
             offset: Offset(0, 24 * (1 - animation.value)),
             child: child,
@@ -597,7 +603,7 @@ class _ProfileHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
 
                 // ── Email ──
                 Text(
@@ -699,7 +705,7 @@ class _SectionCard extends StatelessWidget {
               AppSpacing.md,
             ),
             child: Text(
-              label.toUpperCase(),
+              label,
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 11,
@@ -926,9 +932,10 @@ class _ActionTile extends StatefulWidget {
     required this.iconColor,
     required this.semanticsLabel,
     required this.onTap,
-    super.key,
+    this.actionKey,
   });
 
+  final Key? actionKey;
   final String label;
   final String subtitle;
   final IconData icon;
@@ -955,6 +962,7 @@ class _ActionTileState extends State<_ActionTile> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          key: widget.actionKey,
           borderRadius: BorderRadius.circular(16),
           onTap: widget.onTap,
           onHighlightChanged: (pressed) {
@@ -1071,7 +1079,7 @@ class _SignOutButton extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    'Sign Out',
+                    'Logout',
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,

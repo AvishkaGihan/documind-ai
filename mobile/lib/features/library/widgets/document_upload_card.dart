@@ -148,7 +148,7 @@ class DocumentUploadCard extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
-                'Queued — will upload when online',
+                'Queued - will upload when online',
                 key: const Key('upload-queued-label'),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: tokens.colors.textSecondary,

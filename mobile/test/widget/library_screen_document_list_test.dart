@@ -147,7 +147,10 @@ void main() {
     );
     await pumpFrames(tester);
 
-    await tester.tap(find.byKey(const Key('document-card-doc-ready')));
+    await tester.tap(
+      find.byKey(const Key('document-card-doc-ready')),
+      warnIfMissed: false,
+    );
     await pumpFrames(tester, 8);
 
     expect(find.text('chat-doc-ready'), findsOneWidget);
@@ -174,7 +177,10 @@ void main() {
     await tester.pumpWidget(_buildApp(api));
     await pumpFrames(tester);
 
-    await tester.longPress(find.byKey(const Key('document-card-doc-delete')));
+    await tester.longPress(
+      find.byKey(const Key('document-card-doc-delete')),
+      warnIfMissed: false,
+    );
     await pumpFrames(tester, 2);
     await tester.tap(
       find.byKey(const Key('document-card-menu-delete-doc-delete')),

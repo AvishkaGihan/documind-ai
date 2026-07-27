@@ -87,8 +87,11 @@ class _StatPill extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
           decoration: BoxDecoration(
             color: tokens.colors.surfaceSecondary.withValues(alpha: 0.65),
             borderRadius: BorderRadius.circular(16),

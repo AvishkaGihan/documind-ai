@@ -164,8 +164,12 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await pumpFrames(tester, 8);
 
-    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-action-delete-account')),
+    );
     await pumpFrames(tester, 4);
+    await tester.tap(find.byKey(const Key('settings-action-delete-account')));
+    await pumpFrames(tester, 8);
 
     expect(find.text('Delete Account'), findsWidgets);
     expect(find.text('Cancel'), findsOneWidget);
@@ -191,8 +195,12 @@ void main() {
     );
     await pumpFrames(tester, 8);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-action-delete-account')),
+    );
+    await pumpFrames(tester, 4);
     await tester.tap(find.byKey(const Key('settings-action-delete-account')));
-    await pumpFrames(tester, 3);
+    await pumpFrames(tester, 8);
 
     await tester.tap(find.text('Delete'));
     await pumpFrames(tester, 8);
@@ -211,8 +219,12 @@ void main() {
     );
     await pumpFrames(tester, 8);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-action-delete-account')),
+    );
+    await pumpFrames(tester, 4);
     await tester.tap(find.byKey(const Key('settings-action-delete-account')));
-    await pumpFrames(tester, 3);
+    await pumpFrames(tester, 8);
 
     await tester.tap(find.text('Delete'));
     await pumpFrames(tester, 12);
@@ -238,8 +250,12 @@ void main() {
     );
     await pumpFrames(tester, 8);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-action-delete-account')),
+    );
+    await pumpFrames(tester, 4);
     await tester.tap(find.byKey(const Key('settings-action-delete-account')));
-    await pumpFrames(tester, 3);
+    await pumpFrames(tester, 8);
 
     await tester.tap(find.text('Delete'));
     await pumpFrames(tester, 8);

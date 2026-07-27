@@ -72,7 +72,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('Document Library'), findsOneWidget);
+    expect(find.text('Your Library'), findsOneWidget);
     expect(find.byKey(const Key('login-email-field')), findsNothing);
   });
 
@@ -151,7 +151,7 @@ void main() {
     );
     await pumpFrames(tester, 10);
 
-    expect(find.text('Document Library'), findsOneWidget);
+    expect(find.text('Your Library'), findsOneWidget);
 
     await tester.tap(find.text('Settings').first);
     await pumpFrames(tester, 6);
