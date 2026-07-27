@@ -134,9 +134,7 @@ class AiResponseBubble extends StatelessWidget {
                         const SizedBox(height: AppSpacing.md),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: message.citations.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final citation = entry.value;
+                          children: message.citations.map((citation) {
                             final excerpt =
                                 citationExcerpts[citation.pageNumber] ??
                                 citation.textExcerpt;

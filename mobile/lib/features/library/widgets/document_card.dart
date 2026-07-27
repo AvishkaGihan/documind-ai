@@ -5,7 +5,6 @@ import 'package:documind_ai/core/theme/theme_extensions.dart';
 import 'package:documind_ai/features/library/models/document_upload_models.dart';
 import 'package:documind_ai/features/library/widgets/animated_gradient_border.dart';
 import 'package:documind_ai/features/library/widgets/processing_animation.dart';
-import 'package:documind_ai/shared/widgets/accessibility_focus_ring.dart';
 import 'package:flutter/material.dart';
 
 /// A redesigned document card with vertical layout, color-coded accent bar,
