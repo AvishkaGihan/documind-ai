@@ -39,13 +39,13 @@
 
 ## 📸 Screenshots
 
-| Splash Screen | Login & Auth | Home & Library |
+| Splash Screen | Create Account | Home & Library |
 | :---: | :---: | :---: |
-| ![Splash Screen](docs/images/splash_screen.jpeg) | ![Login Screen](docs/images/login_screen.jpeg) | ![Library](docs/images/library_screen.jpeg) |
+| ![Splash Screen](docs/images/splash_screen.png) | ![Create Account](docs/images/create_account_screen.png) | ![Library](docs/images/library_screen.png) |
 
 | Chat Interface | Document Citations | Settings |
 | :---: | :---: | :---: |
-| ![Chat](docs/images/chat_screen.jpeg) | ![Citations](docs/images/citation_view.jpeg) | ![Settings Screen](docs/images/settings_screen.jpeg) |
+| ![Chat](docs/images/chat_screen.png) | ![Citations](docs/images/citation_view.png) | ![Settings Screen](docs/images/settings_screen.png) |
 
 
 
